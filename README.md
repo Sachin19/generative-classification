@@ -4,7 +4,7 @@
 
 Create a conda environment with all the dependencies using
 ```
-conda create --name genprompt --file requirements.txt
+conda env create -n genprompt --file ENV.yml
 ```
 
 Activate the conda environment: `conda activate genprompt`
