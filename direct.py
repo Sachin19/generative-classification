@@ -142,7 +142,9 @@ def get_tokenized_dataset(raw_dataset, tokenizer, textfield="sentence", labelfie
         x = tokenizer([TASK2PROMPT[args.task.split("#")[0]][0].format(text=example) for example in examples[textfield]], max_length=200, truncation=True)
         # x = tokenizer(examples[textfield], max_length=200, truncation=True)
         if label2id is not None:
-                x['labels'] = [label2id[label] for label in examples[labelfield]]
+            x['labels'] = [label2id[label] for label in examples[labelfield]]
+        else:
+            x['labels'] = [label for label in examples[labelfield]]
         return x
 
     tokenized_dataset = raw_dataset.map(preprocess_function, batched=True)
