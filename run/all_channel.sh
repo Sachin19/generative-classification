@@ -35,6 +35,7 @@ for model in "${models[@]}"; do
             --pmi\
             --bettertransformer\
             --num_runs 10\
+            --overwrite\
             --jobid $jobid
 
         python plot.py "results/0923/channel-$setting/$task/$dataset-$data_dir/$model/results.jsonl" "results/0923/channel-$setting/$task/$dataset-$data_dir/$model/results-plot-channel.png" channel_
