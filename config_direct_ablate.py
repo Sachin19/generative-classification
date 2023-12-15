@@ -1,5 +1,7 @@
 TASK2SIMPLE = {
     "sentiment2": ["{text}"],
+    "sentiment2-adv": ["{text}"],
+    "sentiment2-advmix": ["{text}"],
     "sentiment2-mr": ["{text}"],
     "sentiment2-cr": ["{text}"],
     "sentiment2-amazon": ["{text}"],
@@ -25,6 +27,8 @@ TASK2SIMPLE = {
 
 TASK2CONTEXT = {
     "sentiment2": ["Input: {text}"],
+    "sentiment2-adv": ["Input: {text}"],
+    "sentiment2-advmix": ["Input: {text}"],
     "sentiment2-mr": ["Input: {text}"],
     "sentiment2-cr": ["Input: {text}"],
     "sentiment2-amazon": ["Input: {text}"],
@@ -50,6 +54,8 @@ TASK2CONTEXT = {
 
 TASK2INSTRUCT = {
     "sentiment2": ["Is this text negative or positive? {text}"],
+    "sentiment2-adv": ["Is this text negative or positive? {text}"],
+    "sentiment2-advmix": ["Is this text negative or positive? {text}"],
     "sentiment2-mr": ["Is this text negative or positive? {text}"],
     "sentiment2-cr": ["Is this text negative or positive? {text}"],
     "sentiment2-amazon": ["Is this text negative or positive? {text}"],
@@ -100,6 +106,90 @@ TASK2LABELSTRINGS = {
             " There is a positive inclination evident in this text.",
             " The general sentiment of this text is positive.",
             " This text leans positive."
+        ]
+    ],
+        "sentiment2-adv": [
+        [   
+            " This text is meant to trick you but contains a negative bias.",
+            " This oddly worded text is actually negative.",
+            " A negative bias is on display in this deceptive text.",
+            " This text may seem confusing on the surface, but it harbors a negative bias.",
+            " In this deceptive text, a negative bias is cleverly concealed.",
+            " Behind its confusing facade, this text conceals a negative bias.",
+            " This text's misleading nature is overshadowed by its negative bias.",
+            " While it may be misleading, this text unmistakably carries a negative bias.",
+            " This text, while misleading, clearly showcases a negative bias.",
+            " A negative bias lurks beneath the surface of this deceptive text.",
+            " While it may not appear so initially, this text reveals a negative bias."
+        ],
+        [   
+            " This text is meant to trick you but contains a positive bias.",
+            " This oddly worded text is actually positive.",
+            " A positive bias is on display in this deceptive text.",
+            " This text may seem confusing on the surface, but it harbors a positive bias.",
+            " In this deceptive text, a positive bias is cleverly concealed.",
+            " Behind its confusing facade, this text conceals a positive bias.",
+            " This text's misleading nature is overshadowed by its positive bias.",
+            " While it may be misleading, this text unmistakably carries a positive bias.",
+            " This text, while misleading, clearly showcases a positive bias.",
+            " A positive bias lurks beneath the surface of this deceptive text.",
+            " While it may not appear so initially, this text reveals a positive bias."
+        ]
+    ],
+    # "sentiment2-adv": [
+    #     [   
+    #         " This misleading text exhibits a negative bias.",
+    #         " This seemingly positive text is actually negative.",
+    #         " A negative bias is on display in this deceptive text.",
+    #         " This text may seem positive on the surface, but it harbors a negative bias.",
+    #         " In this deceptive text, a negative bias is cleverly concealed.",
+    #         " Behind its facade of positivity, this text conceals a negative bias.",
+    #         " This text's misleading nature is overshadowed by its negative bias.",
+    #         " While it may be misleading, this text unmistakably carries a negative bias.",
+    #         " This text, while misleading, clearly showcases a negative bias.",
+    #         " A negative bias lurks beneath the surface of this seemingly positive text.",
+    #         " While it may appear positive initially, this text reveals a negative bias."
+    #     ],
+    #     [   
+    #         " This misleading text exhibits a positive bias.",
+    #         " This seemingly negative text is actually positive.",
+    #         " A positive bias is on display in this deceptive text.",
+    #         " This text may seem negative on the surface, but it harbors a positive bias.",
+    #         " In this deceptive text, a positive bias is cleverly concealed.",
+    #         " Behind its facade of negativity, this text conceals a positive bias.",
+    #         " This text's misleading nature is overshadowed by its positive bias.",
+    #         " While it may be misleading, this text unmistakably carries a positive bias.",
+    #         " This text, while misleading, clearly showcases a positive bias.",
+    #         " A positive bias lurks beneath the surface of this seemingly negative text.",
+    #         " While it may appear negative initially, this text reveals a positive bias."
+    #     ]
+    # ],
+    "sentiment2-advmix": [
+        [   
+            " This text exhibits a negative bias.",
+            " The inclination of this text is towards the negative side.",
+            " There is a unfavorable slant in this text.",
+            " The overall tone of this text is negative.",
+            " This text shows a leaning against the subject.",
+            " There is a negative inclination in this text.",
+            " This misleading text exhibits a negative bias.",
+            " This seemingly positive text is actually negative.",
+            " A negative bias is on display in this deceptive text.",
+            " This text may seem positive on the surface, but it harbors a negative bias.",
+            " In this deceptive text, a negative bias is cleverly concealed."
+        ],
+        [
+            " This text exhibits a positive bias.",
+            " The inclination of this text is towards the positive side.",
+            " There is a favorable slant in this text.",
+            " The overall tone of this text is positive.",
+            " This text shows a leaning in favor of the subject.",
+            " There is a positive inclination in this text.",
+            " This misleading text exhibits a positive bias.",
+            " This seemingly negative text is actually positive.",
+            " A positive bias is on display in this deceptive text.",
+            " This text may seem negative on the surface, but it harbors a positive bias.",
+            " In this deceptive text, a positive bias is cleverly concealed."
         ]
     ],
     "sentiment2-mr": [
@@ -1056,6 +1146,8 @@ TASK2LABELSTRINGS = {
 
 TASK2ARGS ={
     "sst2": {},
+    "adv_sst2": {},
+    "advmix_sst2": {},
     "sst5": {},
     "yelp2": {},
     "yelp5": {},

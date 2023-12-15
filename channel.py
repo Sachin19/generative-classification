@@ -69,7 +69,7 @@ if args.ablate_context:
 os.makedirs(os.path.dirname(args.results_file), exist_ok=True)
 os.makedirs(os.path.dirname(args.outputs_file), exist_ok=True)
 logfile = os.path.dirname(args.outputs_file) + f"/{args.jobid}.log"
-logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.DEBUG)
+logging.basicConfig(filename=logfile, level=logging.DEBUG)
 
 def get_tokenized_dataset(raw_dataset, tokenizer, textfield="sentence", labelfield="label", label2id=None, space=False):
     def preprocess_function(examples):

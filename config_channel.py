@@ -30,6 +30,90 @@ TASK2LABELSTRINGS = {
             "This movie review leans positive:"
         ]
     ],
+        "sentiment2-adv": [
+        [   
+            "This movie review is meant to trick you but contains a negative bias:",
+            "This oddly worded movie review is actually negative:",
+            "A negative bias is on display in this deceptive movie review:",
+            "This movie review may seem confusing on the surface, but it harbors a negative bias:",
+            "In this deceptive movie review, a negative bias is cleverly concealed:",
+            "Behind its confusing facade, this movie review conceals a negative bias:",
+            "This movie review's misleading nature is overshadowed by its negative bias:",
+            "While it may be misleading, this movie review unmistakably carries a negative bias:",
+            "This movie review, while misleading, clearly showcases a negative bias:",
+            "A negative bias lurks beneath the surface of this deceptive movie review:",
+            "While it may not appear so initially, this movie review reveals a negative bias:"
+        ],
+        [   
+            "This movie review is meant to trick you but contains a positive bias:",
+            "This oddly worded movie review is actually positive:",
+            "A positive bias is on display in this deceptive movie review:",
+            "This movie review may seem confusing on the surface, but it harbors a positive bias:",
+            "In this deceptive movie review, a positive bias is cleverly concealed:",
+            "Behind its confusing facade, this movie review conceals a positive bias:",
+            "This movie review's misleading nature is overshadowed by its positive bias:",
+            "While it may be misleading, this movie review unmistakably carries a positive bias:",
+            "This movie review, while misleading, clearly showcases a positive bias:",
+            "A positive bias lurks beneath the surface of this deceptive movie review:",
+            "While it may not appear so initially, this movie review reveals a positive bias:"
+        ]
+    ],
+    # "sentiment2-adv": [
+    #     [   
+    #         "This misleading movie review exhibits a negative bias:",
+    #         "This seemingly positive movie review is actually negative:",
+    #         "A negative bias is on display in this deceptive movie review:",
+    #         "This movie review may seem positive on the surface, but it harbors a negative bias:",
+    #         "In this deceptive movie review, a negative bias is cleverly concealed:",
+    #         "Behind its facade of positivity, this movie review conceals a negative bias:",
+    #         "This movie review's misleading nature is overshadowed by its negative bias:",
+    #         "While it may be misleading, this movie review unmistakably carries a negative bias:",
+    #         "This movie review, while misleading, clearly showcases a negative bias:",
+    #         "A negative bias lurks beneath the surface of this seemingly positive movie review:",
+    #         "While it may appear positive initially, this movie review reveals a negative bias:"
+    #     ],
+    #     [   
+    #         "This misleading movie review exhibits a positive bias:",
+    #         "This seemingly negative movie review is actually positive:",
+    #         "A positive bias is on display in this deceptive movie review:",
+    #         "This movie review may seem negative on the surface, but it harbors a positive bias:",
+    #         "In this deceptive movie review, a positive bias is cleverly concealed:",
+    #         "Behind its facade of negativity, this movie review conceals a positive bias:",
+    #         "This movie review's misleading nature is overshadowed by its positive bias:",
+    #         "While it may be misleading, this movie review unmistakably carries a positive bias:",
+    #         "This movie review, while misleading, clearly showcases a positive bias:",
+    #         "A positive bias lurks beneath the surface of this seemingly negative movie review:",
+    #         "While it may appear negative initially, this movie review reveals a positive bias:"
+    #     ]
+    # ],
+    "sentiment2-advmix": [
+        [   
+            "This movie review exhibits a negative bias:",
+            "The inclination of this movie review is towards the negative side:",
+            "There is a unfavorable slant in this movie review:",
+            "The overall tone of this movie review is negative:",
+            "This movie review shows a leaning against the subject:",
+            "There is a negative inclination in this movie review:",
+            "This misleading movie review exhibits a negative bias:",
+            "This seemingly positive movie review is actually negative:",
+            "A negative bias is on display in this deceptive movie review:",
+            "This movie review may seem positive on the surface, but it harbors a negative bias:",
+            "In this deceptive movie review, a negative bias is cleverly concealed:"
+        ],
+        [
+            "This movie review exhibits a positive bias:",
+            "The inclination of this movie review is towards the positive side:",
+            "There is a favorable slant in this movie review:",
+            "The overall tone of this movie review is positive:",
+            "This movie review shows a leaning in favor of the subject:",
+            "There is a positive inclination in this movie review:",
+            "This misleading movie review exhibits a positive bias:",
+            "This seemingly negative movie review is actually positive:",
+            "A positive bias is on display in this deceptive movie review:",
+            "This movie review may seem negative on the surface, but it harbors a positive bias:",
+            "In this deceptive movie review, a positive bias is cleverly concealed:"
+        ]
+    ],
     "sentiment2-mr": [
         [   
             "This RottenTomatoes review exhibits a negative bias:",
@@ -984,6 +1068,8 @@ TASK2LABELSTRINGS = {
 
 TASK2ARGS ={
     "sst2": {},
+    "adv_sst2": {},
+    "advmix_sst2": {},
     "sst5": {},
     "yelp2": {},
     "yelp5": {},

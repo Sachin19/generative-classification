@@ -90,7 +90,7 @@ os.makedirs(os.path.dirname(args.outputs_file), exist_ok=True)
 
 logfile = os.path.dirname(args.outputs_file) + f"/{args.jobid}.log"
 print(f"logging in {logfile}")
-logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.DEBUG)
+logging.basicConfig(filename=logfile, level=logging.DEBUG)
 
 class DataCollatorForDirectClassification:  
 
@@ -224,7 +224,7 @@ def main():
     tokenizer.pad_token = tokenizer.eos_token    
     tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    # tokenized_dataset = get_tokenized_dataset(raw_dataset, "sentence", "label")
+    # tokenized_dataset = get_tokenized_dataset(raw_dataset, "sentence", "label")s
     label2id = None
     if args.label2id is not None:
         label2id = eval(args.label2id)
