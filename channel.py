@@ -58,6 +58,7 @@ class ScriptArguments:
 
     num_runs: Optional[int] = field(default=5, metadata={"help": "ok"})
     jobid: Optional[int] = field(default=0, metadata={"help": "ok"})
+    combine: Optional[str] = field(default="", metadata={"help": "ok"})
     
     
 parser = HfArgumentParser(ScriptArguments)
@@ -172,7 +173,7 @@ def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
     return nll
 
 def main():
-    # print(TASK2LABELSTRINGS)
+    #print(TASK2LABELSTRINGS)
     try:
         with open(args.results_file) as fresults_exist:
             if len(fresults_exist.readlines()) >= args.num_runs and not args.overwrite:
@@ -241,8 +242,20 @@ def main():
     logging.info(task_items[1:])
     suffix = "-text" if args.text else ""
     alllabelstrings = [[item.format(*task_items[1:]) for item in items] for items in TASK2LABELSTRINGS[task_items[0]+suffix]]
+    #print("alllabelstrings", alllabelstrings)
     # logging.info(alllabelstrings)
     # input()
+
+    # if combine flag, concatenate the label lists
+    if(args.combine):
+        alllabelstrings = [[],[]]
+        combine_labels = args.combine.split(" ")
+        for t in combine_labels:
+            alllabelstrings[0].extend(TASK2LABELSTRINGS[t][0])
+            alllabelstrings[1].extend(TASK2LABELSTRINGS[t][1])
+        num_labelbatch = len(TASK2LABELSTRINGS[combine_labels[0]][0])
+        num_combine = len(combine_labels)
+
 
     num_labels = len(alllabelstrings)
     num_labelstrings = len(alllabelstrings[0])
@@ -310,7 +323,11 @@ def main():
     init_index = 1
     if args.debug:
         init_index = num_labelstrings
-    end_index = num_labelstrings+1
+
+    if(args.combine):
+        end_index = num_labelbatch+1
+    else:
+        end_index = num_labelstrings+1
     with torch.no_grad():
         for batch in tqdm(eval_dataloader):
             subbatches = []
@@ -381,6 +398,7 @@ def main():
                     
                     nll = torch.cat(nlls, dim=0)
                 else:
+                    # loss computed
                     nll = get_nll(model, tokenizer, new_batch, label_mask, num_labels, num_labelstrings)
                     # logging.info("ok")
             
@@ -395,15 +413,37 @@ def main():
                 del subbatches
                 del label_masks
             
+            #reshape matrix before this to get correct sample
+            #random sample here, k = how many to sample
             for runid in range(args.num_runs):                
                 for k in range(init_index, end_index):
-                    if k < num_labelstrings:
-                        ids = torch.from_numpy(np.random.choice(np.arange(num_labelstrings), k, replace=False)).to(device)
-                        nll_subset = nll.index_select(dim=1, index=ids)
+
+                    if(args.combine):
+                        if k < num_labelbatch:
+                            ids = torch.empty((0), dtype=torch.int64)
+                            id_array = []
+                            for i in range(num_combine):
+                                #print("sizes ", ids.dim)
+                                #print(ids)
+                                #print(ids.dim())
+                                select = torch.from_numpy(np.random.choice(np.arange(i*num_labelbatch, i*num_labelbatch+num_labelbatch), k, replace=False))
+                                #print(select)
+                                #print(select.dim())
+                                ids = torch.cat((ids, select), 0)
+                            ids = ids.to(device)
+                            nll_subset = nll.index_select(dim=1, index=ids)
+
+                        else:
+                            nll_subset = nll
+
                     else:
-                        nll_subset = nll
-                    if args.debug:
-                        print(labels)
+                        if k < num_labelstrings:
+                            ids = torch.from_numpy(np.random.choice(np.arange(num_labelstrings), k, replace=False)).to(device)
+                            nll_subset = nll.index_select(dim=1, index=ids)
+                        else:
+                            nll_subset = nll
+                        if args.debug:
+                            print(labels)
                     
                     #logsumexp or arithmetic mean of probabilities
                     loss = -torch.logsumexp(-nll_subset, dim=1) + np.log(k)
