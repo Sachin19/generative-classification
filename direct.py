@@ -60,6 +60,7 @@ class ScriptArguments:
 
     num_runs: Optional[int] = field(default=5, metadata={"help": "ok"})
     jobid: Optional[int] = field(default=0, metadata={"help": "ok"})
+    combine: Optional[str] = field(default="", metadata={"help": "ok"})
     
     
 parser = HfArgumentParser(ScriptArguments)
@@ -264,7 +265,19 @@ def main():
     ## 
     logging.info(str(task_items[1:]))
     suffix = "-text" if args.text else ""
+
     alllabelstrings = [[item.format(*task_items[1:]) for item in items] for items in TASK2LABELSTRINGS[task_items[0]+suffix]]
+
+    # if combine flag, concatenate the label lists
+    if(args.combine):
+        alllabelstrings = [[],[]]
+        combine_labels = args.combine.split(" ")
+        for t in combine_labels:
+            alllabelstrings[0].extend(TASK2LABELSTRINGS[t][0])
+            alllabelstrings[1].extend(TASK2LABELSTRINGS[t][1])
+        num_labelbatch = len(TASK2LABELSTRINGS[combine_labels[0]][0])
+        num_combine = len(combine_labels)
+
     num_labels = len(alllabelstrings)
     num_labelstrings = len(alllabelstrings[0])
 
@@ -311,7 +324,11 @@ def main():
         }
     total = 0
     all_labels = []
-    maxk = min(num_labelstrings, args.perplexity_select)
+
+    if(args.combine):
+        maxk = min(num_labelbatch, args.perplexity_select)
+    else:
+        maxk = min(num_labelstrings, args.perplexity_select)
 
     with torch.no_grad():
         nll_ynull = 0
@@ -385,14 +402,26 @@ def main():
                 
                 for runid in range(args.num_runs):
                     for k in range(1, maxk+1):
-                        # logging.info(f"k={k}", end=": ")
-                        if args.perplexity_select == num_labelstrings:
-                            ids = torch.from_numpy(np.random.choice(np.arange(num_labelstrings), k, replace=False)).to(device)
+
+                        if(args.combine):
+                            ids = torch.empty((0), dtype=torch.int64)
+                            id_array = []
+                            for i in range(num_combine):
+                                select = torch.from_numpy(np.random.choice(np.arange(i*num_labelbatch, i*num_labelbatch+num_labelbatch), k, replace=False))
+                                ids = torch.cat((ids, select), 0)
+                            ids = ids.to(device)
+                            nll_subset = nll.index_select(dim=2, index=ids)
+
                         else:
-                            ids = torch.LongTensor(description_indices[:maxk]).to(device)
-                            # logging.info(ids)
-                            # input()
-                        nll_subset = nll.index_select(dim=2, index=ids)
+                            # logging.info(f"k={k}", end=": ")
+                            if args.perplexity_select == num_labelstrings:
+                                ids = torch.from_numpy(np.random.choice(np.arange(num_labelstrings), k, replace=False)).to(device)
+                            else:
+                                ids = torch.LongTensor(description_indices[:maxk]).to(device)
+                                # logging.info(ids)
+                                # input()
+
+                            nll_subset = nll.index_select(dim=2, index=ids)
 
                         # if args.aggregation == "logsumexp":
                         loss = -torch.logsumexp(-nll_subset, dim=2) + np.log(k)

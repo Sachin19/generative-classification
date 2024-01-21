@@ -1,6 +1,5 @@
-
-# models=("gpt2" "gpt2-medium" "gpt2-large" "gpt2-xl" "facebook/opt-1.3b" "EleutherAI/pythia-1.4b")
-models=("gpt2-large")
+#models=("gpt2" "gpt2-medium" "gpt2-large" "gpt2-xl" "facebook/opt-1.3b" "EleutherAI/pythia-1.4b")
+models=("gpt2")
 settings=("simple" "context" "instruct")
 effective_batch_size=100
 
@@ -13,6 +12,7 @@ textfield="$6"
 labelfield="$7"
 label2id="$8"
 jobid="$9"
+combine="${10}"
 
 for model in "${models[@]}"; do
     for setting in "${settings[@]}"; do
@@ -36,7 +36,9 @@ for model in "${models[@]}"; do
             --pmi\
             --bettertransformer\
             --num_runs 10\
-            --jobid $jobid
+            --jobid $jobid\
+            #--combine "$combine"\
+            #--ablate_context
 
         python plot.py "results/0923/direct-$setting/$task/$dataset-$data_dir/$model/results.jsonl" "results/0923/direct-$setting/$task/$dataset-$data_dir/$model/results-plot-direct.png" direct_
         python plot.py "results/0923/direct-$setting/$task/$dataset-$data_dir/$model/results.jsonl" "results/0923/direct-$setting/$task/$dataset-$data_dir/$model/results-plot-direct++.png" direct++_
