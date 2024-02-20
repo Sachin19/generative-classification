@@ -11,17 +11,17 @@ import torch
 from torch.utils.data import DataLoader
 
 from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorWithPadding, HfArgumentParser, BitsAndBytesConfig
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 
 # quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
 
 from config_channel_ablate import TASK2LABELSTRINGS as TASK2ABLATELABELSTRINGS
-from config_channel import TASK2LABELSTRINGS, EXAMPLEFORMAT2ENTAIL, EXAMPLEFORMAT2NOTENTAIL, EXAMPLEFORMAT2, EXAMPLEFORMAT2_SPACE
+from config_channel import TASK2LABELSTRINGS, EXAMPLEFORMAT2, EXAMPLEFORMAT2_SPACE
 
 from dataset_loaders import TASK2LOADER, TOKEN
-
+from seeds import HF_SHUFFLE_SEED
 import logging
-
+from create_cat import create_cat
 def none_or_str(value):
     if value == "None" or value == "none":
         return None
@@ -56,7 +56,8 @@ class ScriptArguments:
     bettertransformer: Optional[bool] = field(default=False, metadata={"help": "ok"})
     ablate_context: Optional[bool] = field(default=False, metadata={"help": "ok"})
     overwrite: Optional[bool] = field(default=False, metadata={"help": "rerun if results already exist"})
-
+    cat: Optional[bool] = field(default=False, metadata={"help": "if this is for CAT calculation"})
+    cat_seed: Optional[int] = field(default=1, metadata={"help": "seed for CAT"})
     num_runs: Optional[int] = field(default=5, metadata={"help": "ok"})
     jobid: Optional[int] = field(default=0, metadata={"help": "ok"})
     
@@ -74,38 +75,13 @@ logging.basicConfig(filename=logfile, level=logging.DEBUG) #, encoding='utf-8'
 
 def get_tokenized_dataset(raw_dataset, tokenizer, textfield1="sentence1", textfield2="sentence2", labelfield="label", label2id=None, space=False):
     def preprocess_function(examples):
-
-        if space:
-            ent = EXAMPLEFORMAT2_SPACE
-            not_ent = EXAMPLEFORMAT2_SPACE
-        else:
-            ent = EXAMPLEFORMAT2
-            not_ent = EXAMPLEFORMAT2
-        arr = [None] * len(examples['label'])
-        # print(len(examples['label']))
-        # print(len(examples[textfield1]))
-        # print(len(examples[textfield2]))
-        for i in range(len(examples['label'])):
-            lab = examples['label'][i]
-            t1 = examples[textfield1][i]
-            t2 = examples[textfield2][i]
-            if lab == 1:
-                arr[i] = not_ent.format(text1=t1, text2=t2)
-            else:
-                arr[i] = ent.format(text1=t1, text2=t2)
-
-        x = tokenizer(arr, max_length=200, add_special_tokens=False, truncation=True)
-        i = 0
-        #print(arr)
-            
-        # x = tokenizer(["\""+example+"\"" for example in examples[textfield]], max_length=200, add_special_tokens=False, truncation=True)
-        # x = tokenizer([example for example in examples[textfield]], max_length=200, add_special_tokens=False, truncation=True)
+        
+        x = tokenizer([EXAMPLEFORMAT2.format(text1=example1, text2=example2) for example1, example2 in zip(examples[textfield1], examples[textfield2])], add_special_tokens=False, truncation=True)
+        
         if label2id is not None:
             x['labels'] = [label2id[label] for label in examples[labelfield]]
         else:
             x['labels'] = [label for label in examples[labelfield]]
-        print("$$$$$$$$$$  SHAPE   $$$$$$$$$$")
-        print(x.keys())
         return x
 
     tokenized_dataset = raw_dataset.map(preprocess_function, batched=True)
@@ -197,7 +173,7 @@ def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
     # logging.info(nll)
 
     nll = nll.view(num_labels, num_labelstrings, -1) # to organize better by classes
-    print(nll.shape)
+    # print(nll.shape)
     # logging.info(nll)
     return nll
 
@@ -257,8 +233,8 @@ def main():
         elif args.model_dtype == "fp16":
             model.half()
 
-        if args.bettertransformer:
-            model = model.to_bettertransformer()
+        # if args.bettertransformer:
+        #     model = model.to_bettertransformer()
 
         if not args.device_map:
             model.to(device)
@@ -275,7 +251,7 @@ def main():
     alllabelstrings = [[item.format(*task_items[1:]) for item in items] for items in TASK2LABELSTRINGS[task_items[0]+suffix]]
     # logging.info(alllabelstrings)
     # input()
-    print(alllabelstrings) # these are the paraphrases
+    # print(alllabelstrings) # these are the paraphrases
     num_labels = len(alllabelstrings)
     num_labelstrings = len(alllabelstrings[0])
 
@@ -296,6 +272,8 @@ def main():
 
     if task_items[0] in TASK2LOADER: # not too important
         loader, params = TASK2LOADER[task_items[0]]
+        # print("***************")
+        # print(loader, params)
         params += task_items[1:]
         logging.info(params)
         raw_dataset = loader(*params)
@@ -305,8 +283,12 @@ def main():
         data_files=None
         if args.data_files is not None:
             data_files={args.split: args.data_files}
-        raw_dataset = load_dataset(args.dataset, args.data_dir, split=args.split, data_files=data_files, cache_dir="datasets")
-
+        if args.cat:
+            raw_dataset = raw_dataset = create_cat(args.dataset, args.data_dir, split=args.split, text1=args.textfield1, text2=args.textfield2, labels=args.labelfield, seed=args.cat_seed)
+        else:
+            raw_dataset = load_dataset(args.dataset, args.data_dir, split=args.split, data_files=data_files, cache_dir="datasets")
+        if len(raw_dataset) > 1000:
+            raw_dataset = Dataset.from_dict(raw_dataset.shuffle(seed=HF_SHUFFLE_SEED)[:1000])
     # tokenized_dataset = get_tokenized_dataset(raw_dataset, "sentence", "label")
     label2id = None
     if args.label2id is not None:
@@ -314,7 +296,10 @@ def main():
     # tokenize the premise and hypothesis
     tokenized_dataset = get_tokenized_dataset(raw_dataset, tokenizer, args.textfield1, args.textfield2, args.labelfield, label2id, ("gpt" in args.model or "pythia" in args.model or "opt" in args.model) and ("hate" in args.task))
     logging.info("datasets and tokenizer loaded")
-
+    # print("***************")
+    # for t1, t2 in zip(raw_dataset[args.textfield1][:10], raw_dataset[args.textfield2][:10]):
+    #     print(t1, t2)
+    #     print()
     
     ##
     # padding?
@@ -332,7 +317,7 @@ def main():
         'average': [[0 for k in range(1, num_labelstrings+1)] for runid in range(args.num_runs)],
         'vote': [[0 for k in range(1, num_labelstrings+1)] for runid in range(args.num_runs)]
         }
-    print(accurate)
+    # print(accurate)
     all_predictions = {
         'logsumexp': [[[] for k in range(1, num_labelstrings+1)] for runid in range(args.num_runs)],
         'average': [[[] for k in range(1, num_labelstrings+1)] for runid in range(args.num_runs)],
@@ -360,8 +345,8 @@ def main():
                 for i in range(len(alllabelstrings_tokenized)): # for each label
                     nlls_per_label = []
                     for j in range(num_labelstrings): # for each prompt per label
-                        print("--------------SUBBATCH------------")
-                        print(sub_batch)
+                        # print("--------------SUBBATCH------------")
+                        # print(sub_batch)
                         sub_batch, label_mask = process_batch(batch, alllabelstrings_tokenized, i, j, device, tokenizer)
                         nlls_per_label.append(get_nll(model, tokenizer, sub_batch, label_mask, 1, 1))
                         # outputs_per_labelstring = model(**batch_per_label)
@@ -396,8 +381,8 @@ def main():
                     nlls = []
                     sub_batch_size = new_batch['input_ids'].size(0)//num_labels #args.batch_size*num_labelstrings
                     for i in range(num_labels):
-                        print("______BATCHPER")
-                        print(batch_per_label)
+                        # print("______BATCHPER")
+                        # print(batch_per_label)
                         batch_per_label = {k: v[i*sub_batch_size:(i+1)*sub_batch_size, ...] for k, v in new_batch.items()}
                         per_label_mask = label_mask[i*sub_batch_size:(i+1)*sub_batch_size, ...]
                         # print(batch_per_label['input_ids'].size())
@@ -475,15 +460,15 @@ def main():
                     all_predictions['average'][runid][k-init_index] += result_average.tolist()
                     all_predictions['vote'][runid][k-init_index] += result_vote.tolist()
 
-    def compute_metric(cm):
-        if args.metric == "accuracy":
+    def compute_metric(cm, metric):
+        if metric == "accuracy":
             cm = np.array(cm)
             num_classes = cm.shape[0]
             true_positives = np.sum(np.diag(cm))
             total_population = np.sum(cm)
             accuracy = true_positives / total_population
             return accuracy
-        elif args.metric == "f1":
+        elif metric == "f1":
             
             cm = np.array(cm)
             num_classes = cm.shape[0]
@@ -492,10 +477,10 @@ def main():
             recall_per_class = np.zeros(num_classes)
             
             for i in range(num_classes):
-                precision_per_class[i] = cm[i, i] / np.sum(cm[:, i])
-                recall_per_class[i] = cm[i, i] / np.sum(cm[i, :])
+                precision_per_class[i] = cm[i, i] / (np.sum(cm[:, i])+1e-7)
+                recall_per_class[i] = cm[i, i] / (np.sum(cm[i, :])+1e-7)
             
-            f1_score_per_class = 2 * (precision_per_class * recall_per_class) / (precision_per_class + recall_per_class)
+            f1_score_per_class = 2 * (precision_per_class * recall_per_class) / (precision_per_class + recall_per_class + 1e-7)
             macro_average_f1_score = np.mean(f1_score_per_class)
             return macro_average_f1_score
         else:
@@ -503,11 +488,14 @@ def main():
         
     for runid in range(args.num_runs):
         result = { 
-            "metric_name": args.metric,
+            # "metric_name": args.metric,
             "k": [],
-            'metric_geometric': [],
-            'metric_arithmetic': [],
-            'metric_harmonic': [], 
+            'f1_geometric': [],
+            'f1_arithmetic': [],
+            'f1_harmonic': [], 
+            'accuracy_geometric': [],
+            'accuracy_arithmetic': [],
+            'accuracy_harmonic': [],
             'confusion_matrix_geometric': [],
             'confusion_matrix_arithmetic': [],
             'confusion_matrix_harmonic': []
@@ -522,16 +510,17 @@ def main():
             # result['accuracy_logsumexp'].append(accurate['logsumexp'][runid][k-init_index]/total)
             # result['accuracy_average'].append(accurate['average'][runid][k-init_index]/total)
             # result['accuracy_vote'].append(accurate['vote'][runid][k-init_index]/total)
-            result['metric_geometric'].append(compute_metric(cm_geometric))
-            result['metric_arithmetic'].append(compute_metric(cm_arithmetic))
-            result['metric_harmonic'].append(compute_metric(cm_harmonic))
+            for m in ["f1", "accuracy"]:
+                result[m+'_geometric'].append(compute_metric(cm_geometric, m))
+                result[m+'_arithmetic'].append(compute_metric(cm_arithmetic, m))
+                result[m+'_harmonic'].append(compute_metric(cm_harmonic, m))
             
             result['confusion_matrix_geometric'].append(str(cm_geometric))
             result['confusion_matrix_arithmetic'].append(str(cm_arithmetic))
             result['confusion_matrix_harmonic'].append(str(cm_harmonic))
 
-            logging.info(f"runid={runid}, k={k}, {args.metric}_arithmetic-mean: {result['metric_arithmetic'][-1]}")
-            logging.info(f"confusion matrix: \n{cm_arithmetic}")
+            # logging.info(f"runid={runid}, k={k}, {args.metric}_arithmetic-mean: {result['metric_arithmetic'][-1]}")
+            # logging.info(f"confusion matrix: \n{cm_arithmetic}")
         fresults.write(json.dumps(result) + "\n")
         
         outputfile = os.path.dirname(args.outputs_file) + f"/run-{runid}_" + os.path.basename(args.outputs_file)
