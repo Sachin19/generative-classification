@@ -69,7 +69,7 @@ if args.ablate_context:
 os.makedirs(os.path.dirname(args.results_file), exist_ok=True)
 os.makedirs(os.path.dirname(args.outputs_file), exist_ok=True)
 logfile = os.path.dirname(args.outputs_file) + f"/{args.jobid}.log"
-logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.DEBUG)
+logging.basicConfig(filename=logfile, level=logging.DEBUG) #, encoding='utf-8'
 
 def get_tokenized_dataset(raw_dataset, tokenizer, textfield="sentence", labelfield="label", label2id=None, space=False):
     def preprocess_function(examples):
@@ -328,6 +328,7 @@ def main():
                     nlls_per_label = []
                     for j in range(num_labelstrings): # for each prompt per label
                         sub_batch, label_mask = process_batch(batch, alllabelstrings_tokenized, i, j, device, tokenizer)
+                        
                         nlls_per_label.append(get_nll(model, tokenizer, sub_batch, label_mask, 1, 1))
                         # outputs_per_labelstring = model(**batch_per_label)
                         # logits1 = outputs_per_labelstring.logits

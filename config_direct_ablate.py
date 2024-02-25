@@ -13,6 +13,7 @@ TASK2SIMPLE = {
     "sentiment5-yelp": ["{text}"],
     "emotion6": ["{text}"],
     "agnews": ["{text}"],
+    "trec": ["{text}"],
     "dbpedia": ["{text}"],
     "hate_speech18": ["{text}"],
     "ethos-national_origin": ["{text}"],
@@ -38,6 +39,7 @@ TASK2CONTEXT = {
     "sentiment5-yelp": ["Input: {text}"],
     "emotion6": ["Input: {text}"],
     "agnews": ["Input: {text}"],
+    "trec": ["Input: {text}"],
     "dbpedia": ["Input: {text}"],
     "hate_speech18": ["Input: {text}"],
     "ethos-national_origin": ["Input: {text}"],
@@ -63,6 +65,7 @@ TASK2INSTRUCT = {
     "sentiment5-yelp": ["Is this text very negative, negative, neutral, positive or very positive? {text}"],
     "emotion6": ["Does this text emote sadness, joy, love, anger, fear, or surprise? {text}"],
     "agnews": ["Is the topic of this text world, sports, business, or science and technology? {text}"],
+    "trec": ["Which category of Abbreviation, Entity, Description, Human being, Location or Numeric Value does the answer to this text belong to? {text}"],
     "dbpedia": ["What is the topic of this text? {text}"],
     "hate_speech18": ["Does this text contain hate speech? {text}"],
     "ethos-national_origin": ["Does this text contain hate speech about national origin? {text}"],
@@ -700,6 +703,86 @@ TASK2LABELSTRINGS = {
             " This text relates to the dynamic field of technology and innovation."
         ]
     ],
+    "trec": [
+        [
+            " An abbreviation is the solution to this text.",
+            " This text is resolved with an abbreviation.",
+            " In response to this text, an abbreviation is provided.",
+            " The solution to this text is represented by an abbreviation.",
+            " An abbreviation serves as the response to this text.",
+            " This text's answer is an abbreviation.",
+            " An abbreviation is the reply to this text.",
+            " In this text, an abbreviation is the answer.",
+            " An abbreviation is the response to this particular text.",
+            " This text can be answered with an abbreviation.",
+            " The answer to this text is simply an abbreviation."
+        ],
+        [
+            " An entity is the response to this text.",
+            " This text is resolved with an entity.",
+            " In response to this text, an entity is provided.",
+            " The solution to this text is represented by an entity.",
+            " An entity serves as the response to this text.",
+            " This text's answer is an entity.",
+            " An entity is the reply to this text.",
+            " In this text, an entity is the answer.",
+            " An entity is the response to this particular text.",
+            " This text can be answered with an entity.",
+            " The response to this text is simply an entity."
+        ],
+        [
+            " A description is the response to this text.",
+            " This text is resolved with a description.",
+            " In response to this text, a description is provided.",
+            " The solution to this text is represented by a description.",
+            " A description serves as the response to this text.",
+            " This text's answer is a description.",
+            " A description is the reply to this text.",
+            " In this text, a description is the answer.",
+            " A description is the response to this particular text.",
+            " This text can be answered with a description.",
+            " The response to this text is simply a description."
+        ],
+        [
+            " A human being is the response to this text.",
+            " This text is resolved with a human being.",
+            " In response to this text, a human being is provided.",
+            " The solution to this text is represented by a human being.",
+            " A human being serves as the response to this text.",
+            " This text's answer is a human being.",
+            " A human being is the reply to this text.",
+            " In this text, a human being is the answer.",
+            " A human being is the response to this particular text.",
+            " This text can be answered with a human being.",
+            " The response to this text is simply a human being."
+        ],
+        [
+            " A location is the response to this text.",
+            " This text is resolved with a location.",
+            " In response to this text, a location is provided.",
+            " The solution to this text is represented by a location.",
+            " A location serves as the response to this text.",
+            " This text's answer is a location.",
+            " A location is the reply to this text.",
+            " In this text, a location is the answer.",
+            " A location is the response to this particular text.",
+            " This text can be answered with a location.",
+            " The response to this text is simply a location."
+        ],
+        [
+            " A numeric value is the response to this text.",
+            " This text is resolved with a numeric value.",
+            " In response to this text, a numeric value is provided.",
+            " The solution to this text is represented by a numeric value.",
+            " A numeric value serves as the response to this text.",
+            " This text's answer is a numeric value.",
+            " A numeric value is the reply to this text.",
+            " In this text, a numeric value is the answer.",
+            " A numeric value is the response to this particular text.",
+            " This text can be answered with a numeric value.",
+            " The response to this text is simply a numeric value."
+        ]
+    ],
     "dbpedia": [
         [
             " This text is about a company.",
@@ -1045,8 +1128,32 @@ TASK2LABELSTRINGS = {
         ],
     ],
     "rte": [
-        [" The premise entails the hypothesis."],
-        [" The premise does not entail the hypothesis."]
+        [
+            " The first text entails the second text.",
+            " The second text is inferred from the first text.",
+            " The first text implies the second text.",
+            " From the first text, the second text is derived.",
+            " The first text leads to the second text.",
+            " The first text suggests the second text.",
+            " The second text is a consequence of the first text.",
+            " The first text gives rise to the second text.",
+            " The first text brings about the second text.",
+            " The second text has its roots in the first text.",
+            " The first text serves as a precursor to the second text."
+        ],
+        [
+            " The first text does not entail the second text.",
+            " The second text isn't inferred from the first text.",
+            " The first text doesn't imply the second text.",
+            " From the first text, the second text isn't derived.",
+            " The first text doesn't lead to the second text.",
+            " The first text doesn't suggest the second text.",
+            " The second text isn't a consequence of the first text.",
+            " The first text doesn't give rise to the second text.",
+            " The first text doesn't bring about the second text.",
+            " The second text doesn't have its roots in the first text.",
+            " The first text doesn't serve as a precursor to the second text."
+        ]
     ],
     "cb": [
         [" The premise entails the hypothesis."],
@@ -1067,6 +1174,7 @@ TASK2ARGS ={
     "subjectivity": {},
     "boolq": {},
     "jigsaw": {},
+    "rte": {},
     "hate_speech18": {},
 }
 

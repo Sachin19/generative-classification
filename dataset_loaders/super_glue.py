@@ -4,7 +4,7 @@ import numpy as np
 from datasets import Dataset, load_dataset
 
 def get_evaluation_set(subset, few_shot_k=0, few_shot_seed=0):
-    dataset = load_dataset("super_glue", subset, cache_dir="/projects/tir5/users/sachink/generative-classifiers/2023/datasets/")
+    dataset = load_dataset("super_glue", subset)#, cache_dir="/projects/tir5/users/sachink/generative-classifiers/2023/datasets/")
     few_shot_examples, test_lines = get_train_test_lines(dataset, subset, int(few_shot_k), int(few_shot_seed))
     test_lines = list(zip(*test_lines))
 

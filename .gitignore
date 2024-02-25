@@ -1,2 +1,10 @@
 datasets/
 *.pyc
+models/
+__pycache__/
+*.out
+results/
+useless/
+sruns/
+test/
+*mcq*

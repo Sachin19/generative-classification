@@ -90,11 +90,11 @@ os.makedirs(os.path.dirname(args.outputs_file), exist_ok=True)
 
 logfile = os.path.dirname(args.outputs_file) + f"/{args.jobid}.log"
 print(f"logging in {logfile}")
-logging.basicConfig(filename=logfile, encoding='utf-8', level=logging.DEBUG)
+logging.basicConfig(filename=logfile, level=logging.DEBUG) #, encoding='utf-8'
 
 class DataCollatorForDirectClassification:  
 
-    def __init__(self, tokenizer, label_features, device) -> None:
+    def __init__(self, tokenizer, label_features, device) -> None: # what is label_features?
         self.tokenizer = tokenizer
         self.label_features = label_features
         self.extra_padding = torch.empty(label_features['input_ids'].size(0), 200).int().data.fill_(tokenizer.pad_token_id).to(device)
@@ -133,7 +133,7 @@ class DataCollatorForDirectClassification:
                     'label_mask': torch.cat(new_features['label_mask'], dim=0).to(self.device),
                     'labels': labels.to(self.device)
                 }
-
+        print(batch['input_ids'].shape)
         return batch
 
 def get_tokenized_dataset(raw_dataset, tokenizer, textfield="sentence", labelfield="label", label2id=None):
@@ -211,6 +211,9 @@ def main():
     task_items = args.task.split("#")
     if task_items[0] in TASK2LOADER:
         loader, params = TASK2LOADER[task_items[0]]
+        print("***********")
+        print(loader)
+        print(params)
         params += task_items[1:]
         logging.info(params)
         raw_dataset = loader(*params)
@@ -319,6 +322,7 @@ def main():
         nll_ynull = 0
         if args.pmi:
             # logging.info(alllabelstrings_tokenized)
+            print(alllabelstrings_tokenized_with_bos)
             outputs = model(**alllabelstrings_tokenized_with_bos)
             logits1 = outputs.logits
             
@@ -383,7 +387,7 @@ def main():
                 # input()
                 
             for prefix, additive in [("direct_", 0), ("direct++_", nll_ynull)]:
-                nll = nll.view(-1, num_labels, num_labelstrings) - additive
+                nll = nll.view(-1, num_labels, num_labelstrings) - additive # note the difference of ordering of dimensions
                 
                 for runid in range(args.num_runs):
                     for k in range(1, maxk+1):

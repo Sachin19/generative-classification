@@ -1,0 +1,1 @@
+bash run/fewshot/nli/rte_fewshot_new.sh
