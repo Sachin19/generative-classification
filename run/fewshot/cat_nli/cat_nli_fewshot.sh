@@ -2,9 +2,9 @@
 # models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
 # models=("mistralai/Mistral-7B-v0.1")
 # models=("gpt2-xl")
-models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
+# models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
 # models=("huggyllama/llama-7b")
-# models=("EleutherAI/gpt-j-6B")
+models=("EleutherAI/gpt-j-6B")
 # models = ("mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf")
 settings=("simple")
 effective_batch_size=1
@@ -46,13 +46,12 @@ for model in "${models[@]}"; do
         --pmi\
         --metric accuracy\
         --num_runs 10\
-        --overwrite\
         --cat y\
         --cat_seed $cat_seed\
         --label_names $label_names\
         --jobid $jobid\
         --type_of_task nli_fewshot\
-        
+        # --overwrite\
             #--bettertransformer\
     python plot_fewshot.py "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/cat/$cat_seed/results.jsonl" "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/cat/$cat_seed/results.png" "$task-$model"
     python csv_fewshot.py "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/cat/$cat_seed/results.jsonl" "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/cat/$cat_seed/results.txt" "$task-$model"
