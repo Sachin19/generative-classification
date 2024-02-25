@@ -33,6 +33,6 @@ def map_hf_dataset_to_list(hf_dataset, split_name):
         if datapoint["label"] > 1: # only deal with hate/nohate
             continue
         text = detokenizer.detokenize(datapoint['text'].split(" "))
-        lines.append((text, datapoint["label"]))
+        lines.append((text, datapoint["label"])) # text label1 label 2... answer. for mcq
     return lines
 

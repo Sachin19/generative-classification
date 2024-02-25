@@ -100,7 +100,7 @@ class DataCollatorForNLI:
             
         tmp = torch.stack(new_features['input_ids'], dim=0)
         
-        _, _, _, length = tmp.shape
+        n, num_class, num_label_strings, length = tmp.shape
         
         batch = { # make the dictionary
                     'input_ids': tmp.view(-1, length).to(self.device), #(B, num_class,num_labelstrings, length)
@@ -435,73 +435,19 @@ def main():
             #     print(key, batch[key].shape)
             # print(batch.keys())
             if args.batch_by_labelstring:
-                nlls = []
-                for i in range(len(alllabelstrings_tokenized)): # for each label
-                    nlls_per_label = []
+                nll = torch.empty(args.batch_size, num_labels, num_labelstrings).to(device)
+                for i in range(num_labels): # for each label
                     for j in range(num_labelstrings): # for each prompt per label
-                        # print("--------------SUBBATCH------------")
-                        # print(sub_batch)
-                        sub_batch, label_mask = process_batch(batch, alllabelstrings_tokenized, i, j, device, tokenizer)
-                        nlls_per_label.append(get_nll(model, tokenizer, sub_batch, label_mask, 1, 1))
-                        # outputs_per_labelstring = model(**batch_per_label)
-                        # logits1 = outputs_per_labelstring.logits
-
-                        # shift_logprobs = torch.nn.functional.log_softmax(logits1[..., :-1, :], dim=-1).contiguous()
-                        # shift_target = batch_per_label['input_ids'][..., 1:].contiguous()
-
-                        # nll = torch.nn.functional.nll_loss(shift_logprobs.view(-1, shift_logprobs.size(-1)), shift_target.view(-1), reduction="none", ignore_index=tokenizer.pad_token_id).view(-1, shift_target.size(-1))
-                        
-                        # nll = nll * per_label_mask[..., 1:]
-                        # deno = (shift_target.ne(tokenizer.pad_token_id).float() * per_label_mask[..., 1:]).sum(dim=-1)
-                        # # input(deno)
-                        # nll = nll.sum(dim=-1)/deno
-
-                        # nlls_per_label.append(nll.view(1, 1, -1))
-                    nlls.append(torch.cat(nlls_per_label, dim=1))
-                nll = torch.cat(nlls, dim=0)
+                        sub_batch={}
+                        # print(batch['input_ids'].shape)
+                        sub_batch['input_ids'], sub_batch['attention_mask'], label_mask_ij = batch['input_ids'][:, i, j, :], batch['attention_mask'][: , i, j, :], label_mask[:, i, j, :]
+                        val = get_nll(model, tokenizer, sub_batch, label_mask_ij, 1, 1)
+                        nll[:, i, j] = val
 
             else:
-                # for i in range(len(alllabelstrings_tokenized)): # for each label
-                #     for j in range(num_labelstrings): # for each prompt per label
-                #         sub_batch, label_mask = process_batch(batch, alllabelstrings_tokenized, i, j, device, tokenizer)
-                #         if args.debug:
-                #             print(tokenizer.batch_decode(sub_batch['input_ids']))
-                #             input("sub")
-                #         subbatches.append(sub_batch)
-                #         label_masks.append(label_mask)
-                # new_batch, label_mask = merge_batches(subbatches, label_masks, tokenizer, device)
-                # print(new_batch['input_ids'].size())
-                if args.batch_by_label:
-                    nlls = []
-                    sub_batch_size = new_batch['input_ids'].size(0)//num_labels #args.batch_size*num_labelstrings
-                    for i in range(num_labels):
-                        # print("______BATCHPER")
-                        # print(batch_per_label)
-                        batch_per_label = {k: v[i*sub_batch_size:(i+1)*sub_batch_size, ...] for k, v in new_batch.items()}
-                        per_label_mask = label_mask[i*sub_batch_size:(i+1)*sub_batch_size, ...]
-                        # print(batch_per_label['input_ids'].size())
-                        nlls.append(get_nll(model, tokenizer, batch_per_label, per_label_mask, 1, num_labelstrings))
-                        # outputs_per_label = model(**batch_per_label)
-                        # logits1 = outputs_per_label.logits
-
-                        # shift_logprobs = torch.nn.functional.log_softmax(logits1[..., :-1, :], dim=-1).contiguous()
-                        # shift_target = batch_per_label['input_ids'][..., 1:].contiguous()
-
-                        # nll = torch.nn.functional.nll_loss(shift_logprobs.view(-1, shift_logprobs.size(-1)), shift_target.view(-1), reduction="none", ignore_index=tokenizer.pad_token_id).view(-1, shift_target.size(-1))
-                        
-                        # nll = nll * per_label_mask[..., 1:]
-                        # deno = (shift_target.ne(tokenizer.pad_token_id).float() * per_label_mask[..., 1:]).sum(dim=-1)
-                        # # input(deno)
-                        # nll = nll.sum(dim=-1)/deno
-
-                        # nlls.append(nll.view(1, num_labelstrings, -1))
-                        # print(nlls[-1].size())
-                    
-                    nll = torch.cat(nlls, dim=0)
-                else:
-                    # print("YES!")
-                    nll = get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings)
-                    # print(nll.shape)
+                # print("YES!")
+                nll = get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings)
+                # print(nll.shape)
                     # logging.info("ok")
             
                 if args.debug:
@@ -611,7 +557,8 @@ def main():
             cm_geometric = confusion_matrix(all_labels, all_predictions['average'][runid][k-init_index])
             cm_arithmetic = confusion_matrix(all_labels, all_predictions['logsumexp'][runid][k-init_index])
             cm_harmonic = confusion_matrix(all_labels, all_predictions['vote'][runid][k-init_index])
-
+            print(cm_arithmetic)
+            input()
             result["k"].append(k)
             # result['accuracy_logsumexp'].append(accurate['logsumexp'][runid][k-init_index]/total)
             # result['accuracy_average'].append(accurate['average'][runid][k-init_index]/total)

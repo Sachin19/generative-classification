@@ -6,20 +6,22 @@ from . import\
      hate_category,
      talk_up,
      social_bias_frames,
-     glue, super_glue,
+     glue, adv_glue, super_glue,
      yelp_polarity,
      yelp_review_full,
      amazon_polarity,
      amazon_review_full, 
      sst5,
      dbpedia,
-     ag_news)
+     ag_news, arc, sick, mmlu, piqa, winogrande, openbookqa, commonsense_qa, boolq, multi_nli)
 
 import numpy as np
 
 TOKEN = "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"
 TASK2LOADER = {
     "agnews": (ag_news.get_evaluation_set, ["/projects/tir5/users/sachink/generative-classifiers/label-bias/data/agnews/test.csv"]),
+    "arc_challenge": (arc.get_evaluation_set, ["ARC-Challenge"]),
+    "arc_easy": (arc.get_evaluation_set, ["ARC-Easy"]),
     "hate_speech18": (hate_speech18.get_evaluation_set, []),
     "ethos-national_origin": (ethos.get_evaluation_set, ["national_origin"]),
     "ethos-race": (ethos.get_evaluation_set, ["race"]),
@@ -30,6 +32,9 @@ TASK2LOADER = {
     "tweet_eval-stance_atheism": (tweet_eval.get_evaluation_set, ["stance_atheism"]),
     "tweet_eval-stance_feminist": (tweet_eval.get_evaluation_set, ["stance_feminist"]),
     "finance_sentiment3": (financial_phrasebank.get_evaluation_set, ["sentences_allagree"]),
+    "mmlu": (mmlu.get_evaluation_set, ["miscellaneous"]),
+    # "multi_nli": (multi_nli.get_evaluation_set, []),
+    "piqa": (piqa.get_evaluation_set, []),
     "potato_prolific_politeness": (potato_prolific_politeness.get_evaluation_set, []),
     "potato_prolific_politeness_binary": (potato_prolific_politeness.get_evaluation_set, [2]),
     "potato_prolific_politeness_binary_extreme": (potato_prolific_politeness.get_evaluation_set, [2, True]),
@@ -37,13 +42,19 @@ TASK2LOADER = {
     "hate_identity": (hate_category.get_evaluation_set, ["identity_hate_corpora.jsonl"]),
     "talk_up": (talk_up.get_evaluation_set, ["talk-up.csv"]),
     "social_bias_frames": (social_bias_frames.get_evaluation_set, []),
-    "sentiment2": (glue.get_evaluation_set, ["sst2"]),
-    "rte": (super_glue.get_evaluation_set, ["rte"]),
-    "cb": (super_glue.get_evaluation_set, ["cb"]),
+    "sentiment2": (adv_glue.get_evaluation_set, ["adv_sst2"]),
+    # "sick": (sick.get_evaluation_set, []),
+    # "rte": (super_glue.get_evaluation_set, ["rte"]),
+    # "cb": (super_glue.get_evaluation_set, ["cb"]),
     "sentiment2-yelp": (yelp_polarity.get_evaluation_set, []),
     "sentiment5-yelp": (yelp_review_full.get_evaluation_set, []),
     "sentiment2-amazon": (amazon_polarity.get_evaluation_set, []),
     "sentiment5-amazon": (amazon_review_full.get_evaluation_set, []),
     "sentiment5": (sst5.get_evaluation_set, []),
     "dbpedia": (dbpedia.get_evaluation_set, []),
+    "winogrande": (winogrande.get_evaluation_set, ["winogrande_debiased"]),
+    # "wnli": (glue.get_evaluation_set, ["wnli"]),
+    "openbookqa": (openbookqa.get_evaluation_set, []),
+    "commonsense_qa": (commonsense_qa.get_evaluation_set, []),
+    "boolq": (boolq.get_evaluation_set, [])
     }

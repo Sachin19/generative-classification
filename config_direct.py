@@ -13,6 +13,7 @@ TASK2SIMPLE = {
     "sentiment5-yelp": ["{text}"],
     "emotion6": ["{text}"],
     "agnews": ["{text}"],
+    "trec": ["{text}"],
     "dbpedia": ["{text}"],
     "hate_speech18": ["{text}"],
     "ethos-national_origin": ["{text}"],
@@ -21,6 +22,9 @@ TASK2SIMPLE = {
     "ethos-religion": ["{text}"],
     "rte": ["{text1}  {text2}"],
     "cb": ["{text1}  {text2}"],
+    "wnli": ["{text1}  {text2}"],
+    "sick": ["{text1} {text2}"],
+    "mnli": ["{text1} {text2}"],
 }
 
 TASK2CONTEXT = {
@@ -38,14 +42,18 @@ TASK2CONTEXT = {
     "sentiment5-yelp": ["Yelp review: {text}"],
     "emotion6": ["Tweet: {text}"],
     "agnews": ["News: {text}"],
+    "trec": ["Question: {text}"],
     "dbpedia": ["Wikipedia article: {text}"],
     "hate_speech18": ["Stormfront post: {text}"],
     "ethos-national_origin": ["Social media comment: {text}"],
     "ethos-sexual_orientation": ["Social media comment: {text}"],
     "ethos-race": ["Social media comment: {text}"],
     "ethos-religion": ["Social media comment: {text}"],
-    "rte": ["{text1}  {text2}"],
-    "cb": ["{text1}  {text2}"],
+    "rte": ["Premise: {text1}. Hypothesis: {text2}"],
+    "cb": ["Premise: {text1}. Hypothesis: {text2}"],
+    "wnli": ["Premise: {text1}. Hypothesis: {text2}"],
+    "sick": ["Premise: {text1}. Hypothesis: {text2}"],
+    "mnli": ["Premise: {text1}. Hypothesis: {text2}"],
 }
 
 TASK2INSTRUCT = {
@@ -63,14 +71,18 @@ TASK2INSTRUCT = {
     "sentiment5-yelp": ["Is this Yelp review very negative, negative, neutral, positive or very positive? {text}"],
     "emotion6": ["Does this tweet emote sadness, joy, love, anger, fear, or surprise? {text}"],
     "agnews": ["Is the topic of this news world, sports, business, or science and technology? {text}"],
+    "trec": ["Which category of Abbreviation, Entity, Description, Human being, Location or Numeric Value does the answer to this question belong to? {text}"],
     "dbpedia": ["What is the topic of this Wikipedia article? {text}"],
     "hate_speech18": ["Does this Stormfront post contain hate speech? {text}"],
     "ethos-national_origin": ["Does this social media comment contain hate speech about national origin? {text}"],
     "ethos-sexual_orientation": ["Does this social media comment contain hate speech about sexual orientation? {text}"],
     "ethos-race": ["Does this social media comment contain hate speech about race? {text}"],
     "ethos-religion": ["Does this social media comment contain hate speech about religion? {text}"],
-    "rte": ["{text1}  {text2}"],
-    "cb": ["{text1}  {text2}"],
+    "rte": ["Does the premise \"{text1}\" entail the hypothesis \"{text2}\"?"], # rewording
+    "wnli": ["Does the premise \"{text1}\" entail the hypothesis \"{text2}\"?"],
+    "cb": ["Does the premise \"{text1}\" entail the hypothesis \"{text2}\"?"],
+    "sick": ["Does the premise \"{text1}\" entail the hypothesis \"{text2}\"?"],
+    "mnli": ["Does the premise \"{text1}\" entail the hypothesis \"{text2}\"?"],
 }
     
 TASK2LABELSTRINGS = {
@@ -700,6 +712,86 @@ TASK2LABELSTRINGS = {
             " This news relates to the dynamic field of technology and innovation."
         ]
     ],
+    "trec": [
+        [
+            " An abbreviation is the solution to this inquiry.",
+            " This query is resolved with an abbreviation.",
+            " In response to this question, an abbreviation is provided.",
+            " The solution to this inquiry is represented by an abbreviation.",
+            " An abbreviation serves as the response to this question.",
+            " This question's answer is an abbreviation.",
+            " An abbreviation is the reply to this question.",
+            " In this case, an abbreviation is the answer.",
+            " An abbreviation is the response to this particular question.",
+            " This question can be answered with an abbreviation.",
+            " The answer to this query is simply an abbreviation."
+        ],
+        [
+            " An entity is the response to this inquiry.",
+            " This question is resolved with an entity.",
+            " In response to this question, an entity is provided.",
+            " The solution to this inquiry is represented by an entity.",
+            " An entity serves as the response to this question.",
+            " This question's answer is an entity.",
+            " An entity is the reply to this question.",
+            " In this case, an entity is the answer.",
+            " An entity is the response to this particular question.",
+            " This question can be answered with an entity.",
+            " The response to this query is simply an entity."
+        ],
+        [
+            " A description is the response to this inquiry.",
+            " This question is resolved with a description.",
+            " In response to this question, a description is provided.",
+            " The solution to this inquiry is represented by a description.",
+            " A description serves as the response to this question.",
+            " This question's answer is a description.",
+            " A description is the reply to this question.",
+            " In this case, a description is the answer.",
+            " A description is the response to this particular question.",
+            " This question can be answered with a description.",
+            " The response to this query is simply a description."
+        ],
+        [
+            " A human being is the response to this inquiry.",
+            " This question is resolved with a human being.",
+            " In response to this question, a human being is provided.",
+            " The solution to this inquiry is represented by a human being.",
+            " A human being serves as the response to this question.",
+            " This question's answer is a human being.",
+            " A human being is the reply to this question.",
+            " In this case, a human being is the answer.",
+            " A human being is the response to this particular question.",
+            " This question can be answered with a human being.",
+            " The response to this query is simply a human being."
+        ],
+        [
+            " A location is the response to this inquiry.",
+            " This question is resolved with a location.",
+            " In response to this question, a location is provided.",
+            " The solution to this inquiry is represented by a location.",
+            " A location serves as the response to this question.",
+            " This question's answer is a location.",
+            " A location is the reply to this question.",
+            " In this case, a location is the answer.",
+            " A location is the response to this particular question.",
+            " This question can be answered with a location.",
+            " The response to this query is simply a location."
+        ],
+        [
+            " A numeric value is the response to this inquiry.",
+            " This question is resolved with a numeric value.",
+            " In response to this question, a numeric value is provided.",
+            " The solution to this inquiry is represented by a numeric value.",
+            " A numeric value serves as the response to this question.",
+            " This question's answer is a numeric value.",
+            " A numeric value is the reply to this question.",
+            " In this case, a numeric value is the answer.",
+            " A numeric value is the response to this particular question.",
+            " This question can be answered with a numeric value.",
+            " The response to this query is simply a numeric value."
+        ]
+    ],
     "dbpedia": [
         [
             " This Wikipedia text is about a company.",
@@ -1045,13 +1137,184 @@ TASK2LABELSTRINGS = {
         ],
     ],
     "rte": [
-        [" The premise entails the hypothesis."],
-        [" The premise does not entail the hypothesis."]
+        [
+            " The premise entails the hypothesis.",
+            " The hypothesis is inferred from the premise.",
+            " The basis implies the hypothesis.",
+            " From the premise, the hypothesis is derived.",
+            " The foundation leads to the hypothesis.",
+            " The starting point suggests the hypothesis.",
+            " The hypothesis is a consequence of the premise.",
+            " The premise gives rise to the hypothesis.",
+            " The premise brings about the hypothesis.",
+            " The hypothesis has its roots in the premise.",
+            " The premise serves as a precursor to the hypothesis."
+        ],
+        [
+            " The premise does not entail the hypothesis.",
+            " The hypothesis isn't inferred from the premise.",
+            " The basis doesn't imply the hypothesis.",
+            " From the premise, the hypothesis isn't derived.",
+            " The foundation doesn't lead to the hypothesis.",
+            " The starting point doesn't suggest the hypothesis.",
+            " The hypothesis isn't a consequence of the premise.",
+            " The premise doesn't give rise to the hypothesis.",
+            " The premise doesn't bring about the hypothesis.",
+            " The hypothesis doesn't have its roots in the premise.",
+            " The premise doesn't serve as a precursor to the hypothesis."
+        ]
+    ],
+    "wnli": [
+        [
+            " The premise does not entail the hypothesis.",
+            " The hypothesis isn't inferred from the premise.",
+            " The basis doesn't imply the hypothesis.",
+            " From the premise, the hypothesis isn't derived.",
+            " The foundation doesn't lead to the hypothesis.",
+            " The starting point doesn't suggest the hypothesis.",
+            " The hypothesis isn't a consequence of the premise.",
+            " The premise doesn't give rise to the hypothesis.",
+            " The premise doesn't bring about the hypothesis.",
+            " The hypothesis doesn't have its roots in the premise.",
+            " The premise doesn't serve as a precursor to the hypothesis."
+        ],
+        [
+            " The premise entails the hypothesis.",
+            " The hypothesis is inferred from the premise.",
+            " The basis implies the hypothesis.",
+            " From the premise, the hypothesis is derived.",
+            " The foundation leads to the hypothesis.",
+            " The starting point suggests the hypothesis.",
+            " The hypothesis is a consequence of the premise.",
+            " The premise gives rise to the hypothesis.",
+            " The premise brings about the hypothesis.",
+            " The hypothesis has its roots in the premise.",
+            " The premise serves as a precursor to the hypothesis."
+        ]
     ],
     "cb": [
-        [" The premise entails the hypothesis."],
-        [" The premise does not entail the hypothesis."]
-    ]
+        [
+            " The premise entails the hypothesis.",
+            " The hypothesis is inferred from the premise.",
+            " The basis implies the hypothesis.",
+            " From the premise, the hypothesis is derived.",
+            " The foundation leads to the hypothesis.",
+            " The starting point suggests the hypothesis.",
+            " The hypothesis is a consequence of the premise.",
+            " The premise gives rise to the hypothesis.",
+            " The premise brings about the hypothesis.",
+            " The hypothesis has its roots in the premise.",
+            " The premise serves as a precursor to the hypothesis."
+        ],
+        [
+            " This premise contradicts the hypothesis.",
+            " The premise undermines the hypothesis.",
+            " From the premise we cannot derive the hypothesis.",
+            " The premise does not suggest the following hypothesis.",
+            " The premise cannot infer the hypothesis.",
+            " The argument doesn't result in the hypothesis.",
+            " The premise doesn't give rise to the hypothesis.",
+            " The premise omits the hypothesis.",
+            " This premise disagrees with this hypothesis.",
+            " The premise opposes the hypothesis.",
+            " The premise clashes with the hypothesis.",
+        ],
+        [
+            "The premise is neutral to the hypothesis.",
+            "The premise is neutral to this.",
+            "The premiseholds a neutral position to.",
+            "The premise is indifferent towards the hypothesis.",
+            "The premise is indifferent towards.",
+            "There is a neutral relationship between and.",
+            "The premise is indifferent concerning the hypothesis.",
+            "The premise is indifferent concerning.",
+            "The premise is impartial to the hypothesis.",
+            "The premise is indifferent to the hypothesis.",
+            "The premise is impartial regarding the hypothesis.",
+        ]
+    ],
+    "sick": [
+        [
+            " The premise entails the hypothesis.",
+            " The hypothesis is inferred from the premise.",
+            " The basis implies the hypothesis.",
+            " From the premise, the hypothesis is derived.",
+            " The foundation leads to the hypothesis.",
+            " The starting point suggests the hypothesis.",
+            " The hypothesis is a consequence of the premise.",
+            " The premise gives rise to the hypothesis.",
+            " The premise brings about the hypothesis.",
+            " The hypothesis has its roots in the premise.",
+            " The premise serves as a precursor to the hypothesis."
+        ],
+        [
+            "The premise is neutral to the hypothesis.",
+            "The premise is neutral to this.",
+            "The premiseholds a neutral position to.",
+            "The premise is indifferent towards the hypothesis.",
+            "The premise is indifferent towards.",
+            "There is a neutral relationship between and.",
+            "The premise is indifferent concerning the hypothesis.",
+            "The premise is indifferent concerning.",
+            "The premise is impartial to the hypothesis.",
+            "The premise is indifferent to the hypothesis.",
+            "The premise is impartial regarding the hypothesis.",
+        ],
+        [
+            " This premise contradicts the hypothesis.",
+            " The premise undermines the hypothesis.",
+            " From the premise we cannot derive the hypothesis.",
+            " The premise does not suggest the following hypothesis.",
+            " The premise cannot infer the hypothesis.",
+            " The argument doesn't result in the hypothesis.",
+            " The premise doesn't give rise to the hypothesis.",
+            " The premise omits the hypothesis.",
+            " This premise disagrees with this hypothesis.",
+            " The premise opposes the hypothesis.",
+            " The premise clashes with the hypothesis.",
+        ]
+    ],
+    "mnli": [
+        [
+            " The premise entails the hypothesis.",
+            " The hypothesis is inferred from the premise.",
+            " The basis implies the hypothesis.",
+            " From the premise, the hypothesis is derived.",
+            " The foundation leads to the hypothesis.",
+            " The starting point suggests the hypothesis.",
+            " The hypothesis is a consequence of the premise.",
+            " The premise gives rise to the hypothesis.",
+            " The premise brings about the hypothesis.",
+            " The hypothesis has its roots in the premise.",
+            " The premise serves as a precursor to the hypothesis."
+        ],
+        [
+            "The premise is neutral to the hypothesis.",
+            "The premise is neutral to this.",
+            "The premiseholds a neutral position to.",
+            "The premise is indifferent towards the hypothesis.",
+            "The premise is indifferent towards.",
+            "There is a neutral relationship between and.",
+            "The premise is indifferent concerning the hypothesis.",
+            "The premise is indifferent concerning.",
+            "The premise is impartial to the hypothesis.",
+            "The premise is indifferent to the hypothesis.",
+            "The premise is impartial regarding the hypothesis.",
+        ],
+        [
+            " This premise contradicts the hypothesis.",
+            " The premise undermines the hypothesis.",
+            " From the premise we cannot derive the hypothesis.",
+            " The premise does not suggest the following hypothesis.",
+            " The premise cannot infer the hypothesis.",
+            " The argument doesn't result in the hypothesis.",
+            " The premise doesn't give rise to the hypothesis.",
+            " The premise omits the hypothesis.",
+            " This premise disagrees with this hypothesis.",
+            " The premise opposes the hypothesis.",
+            " The premise clashes with the hypothesis.",
+        ]
+    ],
 }
 
 TASK2ARGS ={
@@ -1067,6 +1330,7 @@ TASK2ARGS ={
     "subjectivity": {},
     "boolq": {},
     "jigsaw": {},
+    "rte": {},
     "hate_speech18": {},
 }
 
