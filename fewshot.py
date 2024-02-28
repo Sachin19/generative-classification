@@ -165,10 +165,12 @@ def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
 
 def main():
     # np.random.seed(2024)
-    print("OK")
+    print("OK", args.overwrite)
+    print(TOKEN)
     try:
         with open(args.results_file) as fresults_exist:
-            if len(fresults_exist.readlines()) >= args.num_runs and not args.overwrite:
+            print(len(fresults_exist.readlines()))
+            if len(fresults_exist.readlines()) >= args.num_sets and not args.overwrite:
                 print(f'{args.results_file} already exists and is full. exiting.')
                 logging.info(f'{args.results_file} already exists and is full. exiting.')
                 return
@@ -271,9 +273,9 @@ def main():
     # tokenized_dataset = get_tokenized_dataset(raw_dataset, "sentence", "label")
     print("dataseted")
     print("***************")
-    # for t1, t2 in zip(raw_dataset[args.textfield1][:10], raw_dataset[args.textfield2][:10]):
-    #     print(t1, t2)
-    #     print()
+    for t1, t2 in zip(raw_dataset[args.textfield1][:10], raw_dataset[args.textfield2][:10]):
+        print(t1, t2)
+        print()
     # input()
     cf_strs = ["N/A", "", "[MASK]"]
     num_cf = len(cf_strs)

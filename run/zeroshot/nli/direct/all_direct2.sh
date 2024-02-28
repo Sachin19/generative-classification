@@ -34,6 +34,7 @@ for model in "${models[@]}"; do
             --batch_size 8\
             --effective_batch_size ${effective_batch_size}\
             --outputs_file "results/0923/direct-$setting/$task/$dataset-$data_dir/$model/predictions.txt"\
+            --outputs_file_cc "results/0923/direct-$setting/$task/$dataset-$data_dir/$model/predictions.txt_cc"\
             --results_file "results/0923/direct-$setting/$task/$dataset-$data_dir/$model/results.jsonl"\
             --model_dtype fp16\
             --overwrite\

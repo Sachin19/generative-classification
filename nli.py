@@ -215,7 +215,6 @@ def get_tokenized_dataset(raw_dataset, tokenizer, textfield1="sentence1", textfi
 
 
 def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
-
     outputs = model(**batch)
     logits = outputs.logits
     # print(logits.shape)
@@ -343,7 +342,7 @@ def main():
     #     alllabelstrings_tokenized.append(labelstrings_tokenized)
     # # input()
     # ############
-
+    print(TASK2LABELSTRINGS[args.task])
     if task_items[0] in TASK2LOADER: # not too important
         loader, params = TASK2LOADER[task_items[0]]
         params += task_items[1:]
@@ -557,8 +556,8 @@ def main():
             cm_geometric = confusion_matrix(all_labels, all_predictions['average'][runid][k-init_index])
             cm_arithmetic = confusion_matrix(all_labels, all_predictions['logsumexp'][runid][k-init_index])
             cm_harmonic = confusion_matrix(all_labels, all_predictions['vote'][runid][k-init_index])
-            print(cm_arithmetic)
-            input()
+            # print(cm_arithmetic)
+            # input()
             result["k"].append(k)
             # result['accuracy_logsumexp'].append(accurate['logsumexp'][runid][k-init_index]/total)
             # result['accuracy_average'].append(accurate['average'][runid][k-init_index]/total)

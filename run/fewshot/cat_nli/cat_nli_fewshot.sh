@@ -46,13 +46,12 @@ for model in "${models[@]}"; do
         --pmi\
         --metric accuracy\
         --num_runs 10\
-        --overwrite\
         --cat y\
         --cat_seed $cat_seed\
         --label_names $label_names\
         --jobid $jobid\
         --type_of_task nli_fewshot\
-        
+        # --overwrite\
             #--bettertransformer\
     python plot_fewshot.py "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/cat/$cat_seed/results.jsonl" "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/cat/$cat_seed/results.png" "$task-$model"
     python csv_fewshot.py "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/cat/$cat_seed/results.jsonl" "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/cat/$cat_seed/results.txt" "$task-$model"
