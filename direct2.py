@@ -9,8 +9,6 @@ import logging
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
-# import argpa
-
 import torch
 from torch.utils.data import DataLoader
 
@@ -52,6 +50,7 @@ class ScriptArguments:
     effective_batch_size: Optional[int] = field(default=None, metadata={"help": "ok"})
     batch_by_label: Optional[bool] = field(default=False, metadata={"help": "compute forward pass per label separately"})
     outputs_file: Optional[str] = field(default="sentence", metadata={"help": "ok"})
+    outputs_file_cc: Optional[str] = field(default="sentence", metadata={"help": "ok"})
     results_file: Optional[str] = field(default="label", metadata={"help": "ok"})
     metric: Optional[str] = field(default="accuracy", metadata={"help": "ok"})
     model_dtype: Optional[str] = field(default="fp32", metadata={"help": "ok"})
@@ -92,6 +91,7 @@ if args.ablate_context:
 
 os.makedirs(os.path.dirname(args.results_file), exist_ok=True)
 os.makedirs(os.path.dirname(args.outputs_file), exist_ok=True)
+os.makedirs(os.path.dirname(args.outputs_file_cc), exist_ok=True)
 
 logfile = os.path.dirname(args.outputs_file) + f"/{args.jobid}.log"
 print(f"logging in {logfile}")
@@ -196,7 +196,7 @@ def get_nll(model, tokenizer, batch, label_mask):
 
 
 def main():
-    print("********", args.cat, args.cat_seed)
+    print("********", args.cat, args.cat_seed, args.batch_by_label)
     try:
         print(args.results_file)
         with open(args.results_file, "r") as fresults_exist:
@@ -539,6 +539,13 @@ def main():
             #logging.info(len(all_predictions[runid]))
             #logging.info(len(list(zip(*all_predictions[runid]))))
             predictions = [" ".join(map(str, item)) for item in zip(*all_predictions['direct_arithmetic'][runid])]
+            outputs = [f"{label} {output}" for label, output in zip(all_labels, predictions)]
+            foutputs.write("\n".join(outputs) + "\n")
+        
+        cc_outputfile = os.path.dirname(args.outputs_file_cc) + f"/run-{runid}_" + os.path.basename(args.outputs_file_cc)
+
+        with open(cc_outputfile, "w") as foutputs:
+            predictions = [" ".join(map(str, item)) for item in zip(*all_predictions['direct++_arithmetic'][runid])]
             outputs = [f"{label} {output}" for label, output in zip(all_labels, predictions)]
             foutputs.write("\n".join(outputs) + "\n")
 

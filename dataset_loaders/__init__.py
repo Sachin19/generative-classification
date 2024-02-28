@@ -17,7 +17,7 @@ from . import\
 
 import numpy as np
 
-TOKEN = "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"
+TOKEN = "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"
 TASK2LOADER = {
     "agnews": (ag_news.get_evaluation_set, ["/projects/tir5/users/sachink/generative-classifiers/label-bias/data/agnews/test.csv"]),
     "arc_challenge": (arc.get_evaluation_set, ["ARC-Challenge"]),

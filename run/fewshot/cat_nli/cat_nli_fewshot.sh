@@ -2,9 +2,9 @@
 # models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
 # models=("mistralai/Mistral-7B-v0.1")
 # models=("gpt2-xl")
-# models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
+models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
 # models=("huggyllama/llama-7b")
-models=("EleutherAI/gpt-j-6B")
+# models=("EleutherAI/gpt-j-6B")
 # models = ("mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf")
 settings=("simple")
 effective_batch_size=1

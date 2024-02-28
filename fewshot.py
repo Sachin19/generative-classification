@@ -166,6 +166,7 @@ def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
 def main():
     # np.random.seed(2024)
     print("OK", args.overwrite)
+    print(TOKEN)
     try:
         with open(args.results_file) as fresults_exist:
             print(len(fresults_exist.readlines()))

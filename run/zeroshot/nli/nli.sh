@@ -2,11 +2,11 @@
 # models=("EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "gpt2-xl" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
 # models=("mistralai/Mistral-7B-v0.1")
 # models=("google/ul2")
-models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
+# models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
 # models=("gpt2-xl")
-# models=("meta-llama/Llama-2-7b-hf")
+models=("meta-llama/Llama-2-7b-hf")
 settings=("simple")
-effective_batch_size=16
+effective_batch_size=66
 
 task="$1"
 dataset="$2"
@@ -49,6 +49,7 @@ for model in "${models[@]}"; do
             #--debug
             
             #--bettertransformer\
+        echo "plotting"
         python plot.py "results/0923/zeroshot/nli/$task/$dataset-$data_dir/$model/results.jsonl" "results/0923/zeroshot/nli/$task/$dataset-$data_dir/$model/results.png" channel_
         python csv_zeroshot.py "results/0923/zeroshot/nli/$task/$dataset-$data_dir/$model/results.jsonl" "results/0923/zeroshot/nli/$task/$dataset-$data_dir/$model/results.txt" channel_
     done
