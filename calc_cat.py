@@ -44,23 +44,13 @@ for i in range(n):
     for j in range(num_sets):
         for j1 in range(num_sets):
             for k in range(_k):
-                pred = preds[i, j, k] # get the argmax over all runs i.e. the actual predicted value
-                
+                pred = preds[i, j, k] 
                 mod_pred = mod_preds[i, j1, k]
-                # print("***", "pred:", pred, "mod_pred:", mod_pred, "i:", i, "j:", j, "k:", k)
                 if pred != neutral_idx:
-                    # print("yes")
                     total[j, j1, k] += 1
                     if mod_pred != pred:
                         num_corr[j, j1, k] += 1
-                # print(total[k])
-                # print(num_corr[k])
-        # print()
-
-# print(total)
-# print(num_corr)
 cats = np.average(num_corr / total, axis=(0, 1))
-# print(cats)
 
 with open(save_path+f"/{save_file}", 'w') as f:
     f.write(" ".join(cats.astype(str)) + "\n")
