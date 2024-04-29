@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=mcq-fewshot
-#SBATCH --partition=gpu-a40
+#SBATCH --partition=gpu-l40
 #SBATCH --account=ark
 #SBATCH --nodes=1
 #SBATCH --mem=64G

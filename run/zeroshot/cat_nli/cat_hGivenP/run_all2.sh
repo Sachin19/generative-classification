@@ -1,4 +1,4 @@
-cat_seeds=(3 4)
+cat_seeds=(2)
 for cat_seed in "${cat_seeds[@]}"; do
     echo $cat_seed
     bash run/zeroshot/cat_nli/cat_hGivenP/cat_cb_hGivenP.sh $cat_seed

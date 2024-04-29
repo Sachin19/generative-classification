@@ -12,7 +12,7 @@ hypGivenPrem=y
 
 # bash run/all.sh $task $dataset $data_dir $data_files $split $textfield $labelfield $label2id $jobid
 # bash run/all_direct2.sh $task $dataset $data_dir $data_files $split $textfield1 $textfield2 $labelfield $jobid $label2id 
-# echo "completed direct *******************"
+echo "completed direct *******************"
 bash run/zeroshot/nli/nli.sh $task $dataset $data_dir $data_files $split $textfield1 $textfield2 $labelfield $label2id $jobid $hypGivenPrem
 
 # bash run/all_direct_large_models.sh $task $dataset $data_dir $data_files $split $textfield $labelfield $label2id $jobid

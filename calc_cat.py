@@ -1,11 +1,9 @@
 import numpy as np
 import sys 
 from matplotlib import pyplot as plt
+import pickle
 
 # python calc_cat.py original_path cat_path save_path file_name neutral_idx num_runs 
-# print()
-# print("**********")
-# print(sys.argv)
 original_path = sys.argv[1]
 cat_path = sys.argv[2]
 save_path = sys.argv[2]
@@ -38,22 +36,28 @@ mod_preds = compile(cat_path, num_runs) # same shape
 # print(mod_preds)
 # print(preds.shape)
 n, num_sets, _k = preds.shape
-num_corr = np.full((num_sets, num_sets, _k), 0)
-total = np.full((num_sets, num_sets, _k), 1e-12)
+num_corr = np.full((num_sets, _k), 0)
+total = np.full((num_sets, _k), 1e-12)
 for i in range(n):
     for j in range(num_sets):
-        for j1 in range(num_sets):
-            for k in range(_k):
-                pred = preds[i, j, k] 
-                mod_pred = mod_preds[i, j1, k]
-                if pred != neutral_idx:
-                    total[j, j1, k] += 1
-                    if mod_pred != pred:
-                        num_corr[j, j1, k] += 1
-cats = np.average(num_corr / total, axis=(0, 1))
+        for k in range(_k):
+            pred = preds[i, j, k] 
+            mod_pred = mod_preds[i, j, k]
+            if pred != neutral_idx:
+                total[j, k] += 1
+                if mod_pred != pred:
+                    num_corr[j, k] += 1
+cats = num_corr / total
+# print(total)
+# input()
+# print(save_path+f"/count-{save_file}")
+with open(save_path+f"/{save_file}", 'wb') as f:
+    pickle.dump(cats, f)
 
-with open(save_path+f"/{save_file}", 'w') as f:
-    f.write(" ".join(cats.astype(str)) + "\n")
+with open(save_path+f"/count-{save_file}", 'wb') as f:
+    pickle.dump(total / n, f)
+
+    # f.write(" ".join(cats.astype(str)) + "\n")
 
 # plt.plot(range(len(cats)), cats)
 

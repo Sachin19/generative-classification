@@ -3,12 +3,15 @@
 # models=("mistralai/Mistral-7B-v0.1")
 # models=("gpt2-xl")
 # models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
-models=("meta-llama/Llama-2-7b-hf" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "gpt2-xl" "EleutherAI/gpt-j-6B" "tiiuae/falcon-7b")
+# models=("meta-llama/Llama-2-7b-hf" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "gpt2-xl" "EleutherAI/gpt-j-6B" "tiiuae/falcon-7b")
 # models=("EleutherAI/gpt-j-6B")
 # models=("allenai/OLMo-7B")
-# models = ("mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf")
+# models=("meta-llama/Llama-2-7b-hf" "meta-llama/Llama-2-13b-hf" "mistralai/Mistral-7B-v0.1" "EleutherAI/gpt-j-6B")
+# models=("EleutherAI/gpt-neox-20b" "huggyllama/llama-30b" "meta-llama/Llama-2-70b-hf")
+models=("meta-llama/Llama-2-70b-hf" "huggyllama/llama-30b")
+# models=("meta-llama/Llama-2-13b-hf")
 settings=("simple")
-effective_batch_size=1
+# effective_batch_size=12
 
 task="$1"
 dataset="$2"
@@ -21,6 +24,7 @@ labelfield="$8"
 label2id="$9"
 jobid="${10}"
 label_names="${11}"
+effective_batch_size="${12}"
 
 for model in "${models[@]}"; do
     for setting in "${settings[@]}"; do
@@ -37,7 +41,8 @@ for model in "${models[@]}"; do
             --textfield2 $textfield2\
             --labelfield $labelfield\
             --label2id "$label2id"\
-            --batch_size 1\
+            --batch_size 8\
+            --batch_by_labelstring y\
             --effective_batch_size ${effective_batch_size}\
             --outputs_file "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/predictions.txt"\
             --results_file "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/results.jsonl"\
@@ -46,16 +51,16 @@ for model in "${models[@]}"; do
             --pmi\
             --metric accuracy\
             --num_runs 10\
-            --overwrite\
             --label_names $label_names\
             --jobid $jobid\
             --type_of_task nli_fewshot\
+            --overwrite\
 
             #--debug
             
             #--bettertransformer\
-        python plot_fewshot.py "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/results.jsonl" "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/results-plot-channel.png" "$task-$model"
+        python plot_fewshot.py "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/results.jsonl" "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/results.png" "$task-$model"
         python csv_fewshot.py "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/results.jsonl" "results/0923/fewshot/nli/$task/$dataset-$data_dir/$model/results.txt" "$task-$model"
-    
+
     done
 done

@@ -8,7 +8,7 @@ labelfield=label
 label2id=None
 data_files=None
 jobid=$SLURM_JOB_ID
-label_names="False,True"
+label_names="entailment,neutral,contradiction"
 cat_seed="$1"
 
 # bash run/all.sh $task $dataset $data_dir $data_files $split $textfield $labelfield $label2id $jobid

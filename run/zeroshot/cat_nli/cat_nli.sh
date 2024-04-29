@@ -43,7 +43,6 @@ for model in "${models[@]}"; do
             --pmi\
             --metric f1\
             --num_runs 10\
-            --overwrite\
             --hypGivenPrem $hypGivenPrem\
             --jobid $jobid\
             --cat_seed $cat_seed\
@@ -57,4 +56,3 @@ for model in "${models[@]}"; do
     # if [ ]
     # rm -r models/
 done
-rm -r datasets/$dataset/$data_dir

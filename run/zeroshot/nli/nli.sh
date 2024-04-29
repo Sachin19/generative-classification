@@ -2,11 +2,16 @@
 # models=("EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "gpt2-xl" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
 # models=("mistralai/Mistral-7B-v0.1")
 # models=("google/ul2")
-# models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
 # models=("gpt2-xl")
-models=("meta-llama/Llama-2-7b-hf")
+# models=("gpt2-xl" "EleutherAI/gpt-j-6B" "mistralai/Mistral-7B-v0.1" "meta-llama/Llama-2-13b-hf" "huggyllama/llama-7b" "huggyllama/llama-13b" "meta-llama/Llama-2-7b-hf" "tiiuae/falcon-7b")
+# models=("EleutherAI/gpt-j-6B")
+# models=("meta-llama/Llama-2-13b-hf")
+# models=("meta-llama/Llama-2-7b-hf")
+# models=("meta-llama/Llama-2-7b-hf" "meta-llama/Llama-2-13b-hf" "mistralai/Mistral-7B-v0.1" "EleutherAI/gpt-j-6B")
+# models=("EleutherAI/gpt-neox-20b" "huggyllama/llama-30b" "meta-llama/Llama-2-70b-hf")
+models=("meta-llama/Llama-2-70b-hf" "huggyllama/llama-30b" "EleutherAI/gpt-neox-20b")
 settings=("simple")
-effective_batch_size=66
+effective_batch_size=1
 
 task="$1"
 dataset="$2"
@@ -35,7 +40,7 @@ for model in "${models[@]}"; do
             --textfield2 $textfield2\
             --labelfield $labelfield\
             --label2id "$label2id"\
-            --batch_size 8\
+            --batch_size 1\
             --effective_batch_size ${effective_batch_size}\
             --outputs_file "results/0923/zeroshot/nli/$task/$dataset-$data_dir/$model/predictions.txt"\
             --results_file "results/0923/zeroshot/nli/$task/$dataset-$data_dir/$model/results.jsonl"\
@@ -56,4 +61,4 @@ for model in "${models[@]}"; do
     # if [ ]
     # rm -r models/
 done
-rm -r datasets/$dataset/$data_dir
+# rm -r datasets/$dataset/$data_dir

@@ -10,5 +10,5 @@
 #SBATCH --mail-user=hsethu@uw.edu
 
 # I use source to initialize conda into the right environment.
-source activate testenv4
+source activate testenv5
 bash run/fewshot/cat_nli/run_all2.sh

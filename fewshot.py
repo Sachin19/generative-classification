@@ -1,10 +1,17 @@
+import sys
+print("*************")
+# print(sys.path)
+unwanted_path = '/mmfs1/home/hsethu/.local/lib/python3.9/site-packages'
+if unwanted_path in sys.path:
+    sys.path.remove(unwanted_path)
+
 import os
 from dataclasses import dataclass, field
 from typing import Optional, Literal
 from tqdm import tqdm
 import json
 import re
-
+import hf_olmo
 import numpy as np
 from sklearn.metrics import confusion_matrix
 
@@ -14,16 +21,24 @@ from torch.utils.data import DataLoader
 from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorWithPadding, HfArgumentParser, BitsAndBytesConfig, T5ForConditionalGeneration
 from datasets import load_dataset, Dataset
 
-# quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
+quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
 
 from config_channel_ablate import TASK2LABELSTRINGS as TASK2ABLATELABELSTRINGS
 from config_fewshot_new import TASK2LABELSTRINGS, EXAMPLEFORMAT2ENTAIL, EXAMPLEFORMAT2NOTENTAIL, EXAMPLEFORMAT_SPACE2ENTAIL, EXAMPLEFORMAT_SPACE2NOTENTAIL#, EXAMPLEFORMAT2, EXAMPLEFORMAT2_SPACE
+
 from calibration import cc
 from dataset_loaders import TASK2LOADER, TOKEN
-from nli_fewshot_new import get_tokenized_dataset_nli_fewshot
+from nli_fewshot_balanced import get_tokenized_dataset_nli_fewshot
+from nli_fewshot_custom_imbalance import get_tokenized_dataset_nli_fewshot_custom
 from mcq_diff_fewshot import get_tokenized_dataset_mcq_diff_fewshot
 from mcq_fewshot import get_tokenized_dataset_mcq_fewshot
 from mcq_context_fewshot import get_tokenized_dataset_mcq_context_fewshot
+from mmlu_fewshot import get_tokenized_dataset_mmlu
+from sentiment_fewshot import get_tokenized_dataset_sentiment_fewshot
+from dola_jsd_avg import get_nll_jsd_avg
+from dola_word_by_word import get_nll_word_by_word
+
+
 # from cat_nli_fewshot import get_tokenized_dataset_nli_fewshot_cat
 from create_cat import create_cat
 from get_mmlu import get_mmlu
@@ -54,7 +69,7 @@ class ScriptArguments:
     labelfield: Optional[str] = field(default="label", metadata={"help": "ok"})
     label2id: Optional[none_or_str] = field(default=None, metadata={"help": "ok"})
     possible_labels: Optional[str] = field(default="", metadata={"help": "ok"})
-    batch_size: Optional[int] = field(default=4, metadata={"help": "ok"})
+    batch_size: Optional[int] = field(default=1, metadata={"help": "ok"})
     effective_batch_size: Optional[int] = field(default=None, metadata={"help": "ok"})
     batch_by_label: Optional[bool] = field(default=False, metadata={"help": "ok"})
     batch_by_labelstring: Optional[bool] = field(default=True, metadata={"help": "ok"})
@@ -73,15 +88,17 @@ class ScriptArguments:
     aGivenQ: Optional[bool] = field(default=False, metadata={"help": "ok"})
     num_runs: Optional[int] = field(default=5, metadata={"help": "ok"})
     jobid: Optional[int] = field(default=0, metadata={"help": "ok"})
-    k: Optional[int] = field(default=8, metadata={"help": "ok"}) # num few shot examples
+    k: Optional[int] = field(default=3, metadata={"help": "ok"}) # num few shot examples
     num_sets: Optional[int] = field(default=4, metadata={"help": "ok"}) # num sets of examples
     num_fewshot_perms: Optional[int] = field(default=1, metadata={"help": "ok"}) # useless
     passage: Optional[str] = field(default="", metadata={"help": "ok"}) 
     cat: Optional[bool] = field(default=False, metadata={"help": "if this is for CAT calculation"})
     cat_seed: Optional[int] = field(default=1, metadata={"help": "seed for generating cat"})
     want_choice: Optional[bool] = field(default=False, metadata={"help": "ok"})
+    revision: Optional[str] = field(default="main", metadata={"help": "revision of model"})
+    dola_method: Optional[str] = field(default="none", metadata={"help": "which method of intermediate layer decoding to use"})
     
-    
+  
 
 parser = HfArgumentParser(ScriptArguments)
 args = parser.parse_args_into_dataclasses()[0]
@@ -110,134 +127,167 @@ class DataCollatorForNLI:
             new_features['input_ids'].append(feature['input_ids'])
             new_features['attention_mask'].append(feature['attention_mask'])
             new_features['label_mask'].append(feature['label_mask'])
-            new_features['cf_input_ids'].append(feature['cf_input_ids'])
-            new_features['cf_attention_mask'].append(feature['cf_attention_mask'])
-            new_features['cf_label_mask'].append(feature['cf_label_mask'])
+            # new_features['cf_input_ids'].append(feature['cf_input_ids'])
+            # new_features['cf_attention_mask'].append(feature['cf_attention_mask'])
+            # new_features['cf_label_mask'].append(feature['cf_label_mask'])
 
         
         tmp = torch.stack(new_features['input_ids'], dim=0)
-        cf_tmp = torch.stack(new_features['cf_input_ids'], dim=0)
+        # cf_tmp = torch.stack(new_features['cf_input_ids'], dim=0)
         n, num_examples, num_class, total_perm_sets, length = tmp.shape
-        _, _, _, _, c, _ = cf_tmp.shape
+        # _, _, _, _, c, cf_length = cf_tmp.shape
         
         batch = { # make the dictionary
                     'input_ids': tmp.view(n, num_examples, num_class, total_perm_sets, length).to(self.device), 
                     'attention_mask': torch.stack(new_features['attention_mask'], dim=0).view(n, num_examples, num_class, total_perm_sets, length).to(self.device),
                     'labels': labels.to(self.device),
                     'label_mask': torch.stack(new_features['label_mask'], dim=0).view(n, num_examples, num_class, total_perm_sets, length).to(self.device),
-                    'cf_input_ids': cf_tmp.view(n, num_examples, num_class, total_perm_sets, c, length).to(self.device), 
-                    'cf_attention_mask': torch.stack(new_features['cf_attention_mask'], dim=0).view(n, num_examples, num_class, total_perm_sets, c, length).to(self.device),
-                    'cf_label_mask': torch.stack(new_features['cf_label_mask'], dim=0).view(n, num_examples, num_class, total_perm_sets, c, length).to(self.device)
+                    # 'cf_input_ids': cf_tmp.view(nw, num_examples, num_class, total_perm_sets, c, cf_length).to(self.device), 
+                    # 'cf_attention_mask': torch.stack(new_features['cf_attention_mask'], dim=0).view(n, num_examples, num_class, total_perm_sets, c, cf_length).to(self.device),
+                    # 'cf_label_mask': torch.stack(new_features['cf_label_mask'], dim=0).view(n, num_examples, num_class, total_perm_sets, c, cf_length).to(self.device)
                 }
 
         return batch
 
 
-def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
+def get_nll_normal(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
+    # print("normal")
+    with torch.no_grad():
+        outputs = model(**batch)
+        logits = outputs.logits
+        # print(logits.shape)
+        shift_logprobs = torch.nn.functional.log_softmax(logits[..., :-1, :], dim=-1).contiguous()
 
-    outputs = model(**batch)
-    logits = outputs.logits
-    # print(logits.shape)
-    shift_logprobs = torch.nn.functional.log_softmax(logits[..., :-1, :], dim=-1).contiguous()
+        shift_target = batch['input_ids'][..., 1:].contiguous()
+        # print(shift_target.shape)
+        nll = torch.nn.functional.nll_loss(shift_logprobs.view(-1, shift_logprobs.size(-1)), shift_target.view(-1), reduction="none").view(-1, shift_target.size(-1)) # to ensure they correspond and pick the correct word from the dist. reduction is to not do anything extra
+        # reshape and undo reshape
+        # print("##################")
+        # print(nll.shape)
+        # print(label_mask.shape)
+        # print(nll)
+        nll = nll * label_mask[..., 1:]
+        nll = nll.sum(dim=-1)
+        nll = nll.view(-1, num_labels, num_labelstrings) # reorganize this to (B, num_classes, num_labelstrings)
 
-    shift_target = batch['input_ids'][..., 1:].contiguous()
-    # print(shift_target.shape)
-    nll = torch.nn.functional.nll_loss(shift_logprobs.view(-1, shift_logprobs.size(-1)), shift_target.view(-1), reduction="none", ignore_index=tokenizer.pad_token_id).view(-1, shift_target.size(-1)) # to ensure they correspond and pick the correct word from the dist. reduction is to not do anything extra
-    # reshape and undo reshape
-    # print("##################")
-    # print(nll.shape)
-    # print(label_mask.shape)
-    # print(nll)
-    nll = nll * label_mask[..., 1:]
-    # print(nll)
-    # input()
-    deno = (shift_target.ne(tokenizer.pad_token_id).float()).sum(dim=-1) # just to account for the lengths, not too important as lengths of x are the same
-    # input(deno)
-    nll = nll.sum(dim=-1)/deno # actual summation
-    # logging.info(nll)
-    # input()
-    nll = nll.view(-1, num_labels, num_labelstrings) # reorganize this to (B, num_classes, num_labelstrings)
-    # print(nll.shape)
-    # input()
-    # logging.info(nll)
-    return nll
-
+        return nll 
 
 def main():
     # np.random.seed(2024)
     print("OK", args.overwrite)
-    print(TOKEN)
+    # print(TOKEN)
+    print(args.dola_method)
+
+    if args.dola_method == "jsd_avg":
+        get_nll = get_nll_jsd_avg
+    elif args.dola_method == "word_by_word":
+        get_nll = get_nll_word_by_word
+    else:
+        get_nll = get_nll_normal
     try:
         with open(args.results_file) as fresults_exist:
-            print(len(fresults_exist.readlines()))
+            # print(args.results_file)
+            # print(len(fresults_exist.readlines()), args.num_sets)
+            # x = len(fresults_exist.readlines())
+            # y = args.num_sets
+            # print(x >= y)
+            # print(len(fresults_exist.readlines()) >= args.num_sets)
             if len(fresults_exist.readlines()) >= args.num_sets and not args.overwrite:
+                print("YES")
                 print(f'{args.results_file} already exists and is full. exiting.')
                 logging.info(f'{args.results_file} already exists and is full. exiting.')
                 return
     except Exception as e:
         pass 
-
+    # input()
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     task_items = args.task.split("#")
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model, cache_dir="models/", token=TOKEN)
+    if "allenai/OLMo-7B" == args.model:
+        tokenizer = hf_olmo.OLMoTokenizerFast.from_pretrained("allenai/OLMo-7B")
+    else: 
+        tokenizer = AutoTokenizer.from_pretrained(args.model, cache_dir="models/", token=TOKEN)
+    print([tokenizer(l) for l in args.label_names.split(",")])
     logging.info(tokenizer.eos_token)
     logging.info(tokenizer.bos_token)
     logging.info(tokenizer.pad_token)
-    tokenizer.pad_token = tokenizer.eos_token    
+    if not tokenizer.pad_token:
+        tokenizer.pad_token = tokenizer.unk_token 
     tokenizer.pad_token_id = tokenizer.eos_token_id
+    print("OK0")
+    
     print("OK1")
     ############ create the model
-    if args.model_dtype == "bit4":
-        # print("bit4")
-        model = AutoModelForCausalLM.from_pretrained(
-                args.model, cache_dir="models/", trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
-                token=TOKEN,
-                # use_flash_attention_2=True,
-                quantization_config=BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_compute_dtype=torch.bfloat16,
-                    #bnb_4bit_use_double_quant=True,
-                    #bnb_4bit_quant_type='nf4'
-                )
-            ) 
-        # model = AutoModelForCausalLM.from_pretrained(args.model, device_map="auto", load_in_4bit=True, cache_dir="models/")
-        device = model.device
-        # print(device)
-    elif args.model_dtype == "bit8":
-        # print("bit8")
-        model = AutoModelForCausalLM.from_pretrained(args.model, device_map="cuda", load_in_8bit=True, cache_dir="models/", token=TOKEN)
-        device = model.device
+    if args.model == "meta-llama/Llama-2-70b-hf" or args.model == "huggyllama/llama-30b":
+        print("Extra large model")
+        model = AutoModelForCausalLM.from_pretrained(args.model, token=TOKEN, quantization_config=BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        #bnb_4bit_use_double_quant=True,
+                        #bnb_4bit_quant_type='nf4'
+                    ), cache_dir="models/", device_map="auto")
+    elif args.model == "EleutherAI/gpt-neox-20b":
+        print("large model")
+        model = AutoModelForCausalLM.from_pretrained(args.model, token=TOKEN, quantization_config=BitsAndBytesConfig(
+                        load_in_8bit=True,
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        #bnb_4bit_use_double_quant=True,
+                        #bnb_4bit_quant_type='nf4'
+                    ), cache_dir="models/", device_map="auto")
     else:
-        print("else")
-        print(args.model)
-        if args.model in ["EleutherAI/pythia-6.9b"]:
-            print("YES")
-            args.device_map = True
-        print("elsed")
-        if not args.device_map:
-            print("Here")
-            model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", token=TOKEN)#, device_map="auto")
-            print("passed")
+        if args.model_dtype == "bit4":
+            # print("bit4")
+            model = AutoModelForCausalLM.from_pretrained(
+                    args.model, cache_dir="models/", trust_remote_code=True,
+                    torch_dtype=torch.bfloat16,
+                    token=TOKEN,
+                    # use_flash_attention_2=True,
+                    quantization_config=BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        #bnb_4bit_use_double_quant=True,
+                        #bnb_4bit_quant_type='nf4'
+                    )
+                ) 
+            # model = AutoModelForCausalLM.from_pretrained(args.model, device_map="auto", load_in_4bit=True, cache_dir="models/")
+            device = model.device
+            # print(device)
+        elif args.model_dtype == "bit8":
+            # print("bit8")
+            model = AutoModelForCausalLM.from_pretrained(args.model, device_map="cuda", load_in_8bit=True, cache_dir="models/", token=TOKEN)
+            device = model.device
         else:
-            model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", device_map="auto", token=TOKEN)
-        print("U")
-        logging.info("model loaded on cpu")
-        if args.model_dtype == "bf16":
-            model.to(dtype=torch.bfloat16)
-        elif args.model_dtype == "fp16":
-            model.half()
+            # print("else")
+            # print(args.model)
+            if not args.device_map:
+                print("Loading model")
+                if "allenai/OLMo-7B" == args.model:
+                    model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", token=TOKEN, revision=args.revision)
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", token=TOKEN)#, device_map="auto")
+                # print("passed")
+            else:
+                if "allenai/OLMo-7B" == args.model:
+                    model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", device_map="auto", token=TOKEN, revision=args.revision)
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", device_map="auto", token=TOKEN)
+            # print("U")
+            logging.info("model loaded on cpu")
+            if args.model_dtype == "bf16":
+                model.to(dtype=torch.bfloat16)
+            elif args.model_dtype == "fp16":
+                model.half()
 
-        if args.bettertransformer:
-            model = model.to_bettertransformer()
+            if args.bettertransformer:
+                model = model.to_bettertransformer()
 
-        if not args.device_map:
-            model.to(device)
-        logging.info("model loaded on gpu")
+            if not args.device_map:
+                model.to(device)
+            logging.info("model loaded on gpu")
 
     model.eval() # set on evaluation mode
     logging.info(f"{args.model} loaded")
+    # print(model)
 
     logging.info(task_items[1:])
     suffix = "-text" if args.text else ""
@@ -260,8 +310,9 @@ def main():
                 raw_dataset = create_cat(args.dataset, args.data_dir, split=args.split, text1=args.textfield1, text2=args.textfield2, labels=args.labelfield, seed=args.cat_seed)
             else:
                 raw_dataset = load_dataset(args.dataset, args.data_dir, split=args.split, data_files=data_files, cache_dir="datasets")
-            if len(raw_dataset) > 1000:
-                raw_dataset = Dataset.from_dict(raw_dataset.shuffle(seed=HF_SHUFFLE_SEED)[:1000])
+            test_cap = 1000
+            if len(raw_dataset) > test_cap:
+                raw_dataset = Dataset.from_dict(raw_dataset.shuffle(seed=HF_SHUFFLE_SEED)[:test_cap])
         else:
             raw_dataset = get_mmlu("test")
     if args.dataset != "lukaemon/mmlu":
@@ -272,11 +323,6 @@ def main():
         raw_train_dataset= get_mmlu("train")
     # tokenized_dataset = get_tokenized_dataset(raw_dataset, "sentence", "label")
     print("dataseted")
-    print("***************")
-    for t1, t2 in zip(raw_dataset[args.textfield1][:10], raw_dataset[args.textfield2][:10]):
-        print(t1, t2)
-        print()
-    # input()
     cf_strs = ["N/A", "", "[MASK]"]
     num_cf = len(cf_strs)
     label2id = None
@@ -284,23 +330,63 @@ def main():
         label2id = eval(args.label2id)
     create = True
     preprocess_path = f"saved_preprocessed/{args.dataset}-{args.data_dir}"
+    if len(args.label_names.split(",")) == 2:
+        print("YES")
+        args.k = max((args.k * 3) // 2, 1)
+
+    custom = ("hGivenP" in args.task or "pGivenH" in args.task)
+    print("custom:", custom, args.k)
     # if not args.cat:
-    if args.type_of_task == "nli_fewshot":
-        tokenized_dataset = get_tokenized_dataset_nli_fewshot(raw_dataset, raw_train_dataset, tokenizer, args.textfield1, args.textfield2, args.labelfield, label2id, args.task, args.k, args.num_sets, args.label_names, create, preprocess_path, FEWSHOT_SEED)
+    if "sst" in args.data_dir:
+        tokenized_dataset = get_tokenized_dataset_sentiment_fewshot(raw_dataset, raw_train_dataset, tokenizer, args.textfield1, args.labelfield, label2id, args.task, args.k, args.num_sets, args.label_names, create, preprocess_path, FEWSHOT_SEED)
+    elif args.type_of_task == "nli_fewshot":
+        if custom:
+            tokenized_dataset = get_tokenized_dataset_nli_fewshot_custom(raw_dataset, raw_train_dataset, tokenizer, args.textfield1, args.textfield2, args.labelfield, label2id, args.task, args.k, args.num_sets, args.label_names, create, preprocess_path, FEWSHOT_SEED)
+        else:
+            tokenized_dataset = get_tokenized_dataset_nli_fewshot(raw_dataset, raw_train_dataset, tokenizer, args.textfield1, args.textfield2, args.labelfield, label2id, args.task, args.k, args.num_sets, args.label_names, create, preprocess_path, FEWSHOT_SEED)
+    elif args.dataset == "lukaemon/mmlu":
+        tokenized_dataset = get_tokenized_dataset_mmlu(raw_dataset, raw_train_dataset, tokenizer, [0, 1, 2, 4], args.num_sets, create, FEWSHOT_SEED)
+    
     elif args.type_of_task == "mcq_fewshot":
         tokenized_dataset = get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer, args.question, args.choices, args.labelfield, label2id, args.task, args.k, args.num_sets, args.possible_labels, create, preprocess_path, args.want_choice, FEWSHOT_SEED)
     elif args.type_of_task == "mcq_diff_fewshot":
         tokenized_dataset = get_tokenized_dataset_mcq_diff_fewshot(raw_dataset, raw_train_dataset, tokenizer, args.question, args.choices, args.labelfield, label2id, args.task, args.k, args.num_sets, create, preprocess_path, args.want_choice, FEWSHOT_SEED)
     elif args.type_of_task == "mcq_context_fewshot":
         tokenized_dataset = get_tokenized_dataset_mcq_context_fewshot(raw_dataset, raw_train_dataset, tokenizer, args.question, args.passage, args.labelfield, label2id, args.task, args.k, args.num_sets, args.possible_labels, create, preprocess_path, FEWSHOT_SEED)
-    # else: 
-    #     if args.type_of_task == "nli_fewshot":
-    #         tokenized_dataset = get_tokenized_dataset_nli_fewshot_cat(raw_dataset, raw_train_dataset, tokenizer, args.textfield1, args.textfield2, args.labelfield, label2id, args.task, args.k, args.num_sets, args.label_names, create, preprocess_path)
-        
-    # print(tokenized_dataset.column_names)
-    # for key in tokenized_dataset.column_names:
-    #     print(key)#, ":", tokenized_dataset[key])
-    # gc(args.possible_labels.split(","), model, tokenizer, device, torch.unsqueeze(tokenized_dataset['input_ids'][4, 2, 0, :2, :], 0))
+    
+    tok_x = tokenizer.encode("x", add_special_tokens=False)
+    tok_labels = [tokenizer.encode("x " + label_name, add_special_tokens=False)[len(tok_x):] for label_name in args.label_names.split(",")]
+    
+    # calculate all the cc's here
+    if not custom:
+        print("calculating cfs")
+        all_cfs = {
+            "cf_input_ids": tokenized_dataset["cf_input_ids"][0].to(device),
+            "cf_attention_mask": tokenized_dataset["cf_attention_mask"][0].to(device),
+            "cf_label_mask": tokenized_dataset["cf_label_mask"][0].to(device)
+        }
+        cf_shape = all_cfs["cf_input_ids"].shape
+
+        all_cc = torch.zeros((cf_shape[0], cf_shape[1], cf_shape[2]))
+        count = 0
+        for i in range(cf_shape[0]): # k
+            for j in range(cf_shape[1]): # num_classes
+                for k in range(cf_shape[2]): # num_sets
+                    tmp_cfs = []
+                    for l in range(cf_shape[3]):
+                        print(f"{count}/{cf_shape[0]*cf_shape[1]*cf_shape[2]*cf_shape[3]}", end="\r") 
+                        count += 1
+                        cf_batch = {}
+                        cf_batch["input_ids"] = all_cfs["cf_input_ids"][i, j, k, l, :].unsqueeze(0)
+                        cf_batch["attention_mask"] = all_cfs["cf_attention_mask"][i, j, k, l, :].unsqueeze(0)
+                        cf_label_mask = all_cfs["cf_label_mask"][i, j, k, l, :].unsqueeze(0)
+                        tmp_cfs.append(get_nll(model, tokenizer, cf_batch, cf_label_mask, 1, 1))
+
+                    cf_avg = (torch.logsumexp(-torch.Tensor(tmp_cfs), dim=0))
+                    cf_avg = np.log(num_cf) - cf_avg 
+                    all_cc[i, j, k] = cf_avg
+        all_cc.to(device)
+
     num_labels = tokenized_dataset['input_ids'].shape[2]
     if args.effective_batch_size is not None:
         args.batch_size = max(1, args.effective_batch_size // (total_perm_sets * num_labels))
@@ -319,27 +405,19 @@ def main():
     foutputs = open(args.outputs_file, "w")
 
     accurate = { 
-        'results': [[0 for k in range(1, args.k+2)] for setid in range(args.num_sets)],
-        # 'average': [[0 for k in range(1, args.k+1)] for setid in range(args.num_sets)],
-        # 'vote': [[0 for k in range(1, args.k+1)] for setid in range(args.num_sets)]
+        'results': [[0 for _ in range(args.k+1)] for setid in range(args.num_sets)],
         }
 
     all_predictions = {
-        'results': [[[] for k in range(1, args.k+2)] for setid in range(args.num_sets)],
-        # 'average': [[[] for k in range(1, args.k+1)] for setid in range(args.num_sets)],
-        # 'vote': [[[] for k in range(1, args.k+1)] for setid in range(args.num_sets)]
+        'results': [[[] for _ in range(args.k+1)] for setid in range(args.num_sets)],
         }
 
     cc_accurate = { 
-        'results': [[0 for k in range(1, args.k+2)] for setid in range(args.num_sets)],
-        # 'average': [[0 for k in range(1, args.k+1)] for setid in range(args.num_sets)],
-        # 'vote': [[0 for k in range(1, args.k+1)] for setid in range(args.num_sets)]
+        'results': [[0 for _ in range(args.k+1)] for setid in range(args.num_sets)],
         }
 
     cc_all_predictions = {
-        'results': [[[] for k in range(1, args.k+2)] for setid in range(args.num_sets)],
-        # 'average': [[[] for k in range(1, args.k+1)] for setid in range(args.num_sets)],
-        # 'vote': [[[] for k in range(1, args.k+1)] for setid in range(args.num_sets)]
+        'results': [[[] for _ in range(args.k+1)] for setid in range(args.num_sets)],
         }
 
 
@@ -354,7 +432,6 @@ def main():
     results = []
     nlls_ent = []
     nlls_not_ent = []
-    cc_calc = False
     with torch.no_grad():            
         for num_examples in range(args.k+1):
             for batch in tqdm(eval_dataloader):
@@ -365,61 +442,27 @@ def main():
                 del batch['labels']
 
                 label_mask = batch['label_mask']
-                cf_label_mask = batch['cf_label_mask']
-                all_labels_for_batch = torch.squeeze(batch['input_ids'][:, num_examples, :, 0] * batch['label_mask'][:, num_examples, :, 0])
-                # print(all_labels_for_batch)
-                all_labels_for_batch_str = []
-                for lbl in all_labels_for_batch:
-                    # print(lbl[lbl.ne(0)])
-                    all_labels_for_batch_str.append(tokenizer.decode(lbl[lbl.ne(0)]).strip()) # to remove any leading spaces to best represent the actual label. 
-                # print(all_labels_for_batch_str)
-                # print(list(batch['label_mask'][:, num_examples, :, 0]))
-                # print(list(batch['input_ids'][:, num_examples, :, 0]))
-                
-                ccs = torch.zeros((batch['input_ids'].shape[0], batch['input_ids'].shape[2]))
-                # input()
-                # print(ccs.shape)
-                for l in range(batch['input_ids'].shape[0]):
-                    tmp = cc(all_labels_for_batch_str, model, tokenizer, device)
-                    ccs[l, :] = tmp
-                ccs = ccs.to(device)
-                # print(ccs)
-                # input()
-                # print(tokenizer.decode(all_labels_for_batch))
                 del batch['label_mask']
                 if num_examples == 0:
                     all_labels += labels.tolist()
                 total += labels.size(0)
+                # print("batch shape", batch['input_ids'].shape)
                 
 
                 if args.batch_by_labelstring:
-                    nll = torch.empty(args.batch_size, num_labels, total_perm_sets).to(device)
-                    cc_nll = torch.empty(args.batch_size, num_labels, total_perm_sets).to(device)
+                    nll = torch.empty(batch['input_ids'].shape[0], num_labels, total_perm_sets).to(device)
+                    if not custom:
+                        cc_nll = torch.empty(batch['input_ids'].shape[0], num_labels, total_perm_sets).to(device)
                     for i in range(num_labels): # for each label
                         for j in range(total_perm_sets): # for each prompt per label
-                            # print("YES!")
                             sub_batch={}
-                            sub_batch['input_ids'], sub_batch['attention_mask'], label_mask_ij = batch['input_ids'][:, num_examples, i, j, :], batch['attention_mask'][: ,num_examples, i, j, :], label_mask[:, num_examples, i, j, :]
+                            max_len = torch.max(batch['attention_mask'][:, num_examples, i, j, :].sum(dim=-1))
+                            sub_batch['input_ids'], sub_batch['attention_mask'], label_mask_ij = batch['input_ids'][:, num_examples, i, j, :max_len], batch['attention_mask'][:, num_examples, i, j, :max_len], label_mask[:, num_examples, i, j, :max_len]
+                            test_prd = label_mask_ij * sub_batch['input_ids']
                             val = get_nll(model, tokenizer, sub_batch, label_mask_ij, 1, 1)
-                            nll[:, i, j] = val
-                            tmp_cfs = []
-                            for c in range(num_cf):
-                                cf_sub_batch={}
-                                cf_sub_batch['input_ids'], cf_sub_batch['attention_mask'], cf_label_mask_ij = batch['cf_input_ids'][:, num_examples, i, j, c, :], batch['cf_attention_mask'][: ,num_examples, i, j, c, :], cf_label_mask[:, num_examples, i, j, c, :]
-                                cf_val = get_nll(model, tokenizer, cf_sub_batch, cf_label_mask_ij, 1, 1)
-                                tmp_cfs.append(cf_val)
-                            # print()
-                            cf_avg = (torch.logsumexp(-torch.Tensor(tmp_cfs), dim=0))
-                            # print(cf_avg)
-                            cf_avg = np.log(num_cf) - cf_avg 
-                            # print(cf_avg)
-                            cf_avg.to(device)
-                            
-                            # print(nll[:, i, j].shape)
-                            # print(cc_nll[:, i, j].shape)
-                            cc_nll[:, i, j] = nll[:, i, j] - cf_avg # -logP + log(cc) = -log(cc/P)
-                            # print("CCD")
-                            # input()
+                            nll[:, i, j] = val.squeeze()
+                            if not custom:
+                                cc_nll[:, i, j] = nll[:, i, j] - all_cc[num_examples, i, j]
 
                 else:
                     nll = get_nll(model, tokenizer, batch, label_mask, num_labels, total_perm_sets)
@@ -436,12 +479,14 @@ def main():
                     # print(nll.shape)
                     # print(ids)
                     nll_subset = nll[:, :, setid]
-                    cc_nll_subset = cc_nll[:, :, setid]
+                    
                     if args.debug:
                         print(labels)
                     # loss = -torch.logsumexp(-nll_subset, dim=2) + np.log(total_perm_sets) # summing over nl probabilities. To sum, need to convert nll to ll, then exponentiate, them sum, then log again. To prevent underflow (batch size; no. labels).T
                     results = nll_subset.min(dim=1)[1] # an array of label indices, i.e. the prediction
-                    cc_results = cc_nll_subset.min(dim=1)[1]
+                    if not custom:
+                        cc_nll_subset = cc_nll[:, :, setid]
+                        cc_results = cc_nll_subset.min(dim=1)[1]
 
                     # print("###", result_logsumexp.shape)
                     # input()
@@ -466,12 +511,14 @@ def main():
                     #     input()
 
                     accurate['results'][setid][num_examples] += results.eq(labels).int().sum().item()
-                    cc_accurate['results'][setid][num_examples] += cc_results.eq(labels).int().sum().item()
+                    
                     # accurate['average'][setid][num_examples] += result_average.eq(labels).int().sum().item()
                     # accurate['vote'][setid][num_examples] += result_vote.eq(labels).int().sum().item()
 
                     all_predictions['results'][setid][num_examples] += results.tolist()
-                    cc_all_predictions['results'][setid][num_examples] += cc_results.tolist()
+                    if not custom:
+                        cc_accurate['results'][setid][num_examples] += cc_results.eq(labels).int().sum().item()
+                        cc_all_predictions['results'][setid][num_examples] += cc_results.tolist()
                     # all_predictions['average'][setid][num_examples] += result_average.tolist()
                     # all_predictions['vote'][setid][num_examples] += result_vote.tolist()
                     # print(all_predictions['logsumexp'])
@@ -505,31 +552,27 @@ def main():
         
     for setid in range(args.num_sets):
         result = { 
-            # "metric_name": args.metric,
             "k": [],
-            # 'f1_geometric': [],
             'f1': [],
-            # 'f1_harmonic': [], 
-            # 'accuracy_geometric': [],
             'accuracy': [],
-            # 'accuracy_harmonic': [],
-            # 'confusion_matrix_geometric': [],
             'confusion_matrix': [],
-            # 'confusion_matrix_harmonic': []
             'cc_f1': [],
             'cc_accuracy': [],
             'cc_confusion_matrix': []
         }
         for num_examples in range(args.k+1):
             cm = confusion_matrix(all_labels, all_predictions['results'][setid][num_examples])
-            cc_cm = confusion_matrix(all_labels, cc_all_predictions['results'][setid][num_examples])
+            if not custom:
+                cc_cm = confusion_matrix(all_labels, cc_all_predictions['results'][setid][num_examples])
 
             result["k"].append(num_examples)
             for metric in ('f1', 'accuracy'):
                 result[metric].append(compute_metric(cm, metric))
-                result['cc_'+metric].append(compute_metric(cc_cm, metric))
+                if not custom:
+                    result['cc_'+metric].append(compute_metric(cc_cm, metric))
             result['confusion_matrix'].append(str(cm))
-            result['cc_confusion_matrix'].append(str(cc_cm))
+            if not custom:
+                result['cc_confusion_matrix'].append(str(cc_cm))
             
             logging.info(f"confusion matrix: \n{cm}")
         fresults.write(json.dumps(result) + "\n")
@@ -540,13 +583,14 @@ def main():
             predictions = [" ".join(map(str, item)) for item in zip(*all_predictions['results'][setid])]
             outputs = [f"{label} {output}" for label, output in zip(all_labels, predictions)]
             foutputs.write("\n".join(outputs) + "\n")
-
-        cc_outputfile = os.path.dirname(args.cc_outputs_file) + f"/run-{setid}_" + os.path.basename(args.cc_outputs_file)
-        logging.info(cc_outputfile)
-        with open(cc_outputfile, "w") as foutputs:
-            cc_predictions = [" ".join(map(str, item)) for item in zip(*cc_all_predictions['results'][setid])]
-            cc_outputs = [f"{label} {output}" for label, output in zip(all_labels, cc_predictions)]
-            foutputs.write("\n".join(cc_outputs) + "\n")
+        
+        if not custom:
+            cc_outputfile = os.path.dirname(args.cc_outputs_file) + f"/run-{setid}_" + os.path.basename(args.cc_outputs_file)
+            logging.info(cc_outputfile)
+            with open(cc_outputfile, "w") as foutputs:
+                cc_predictions = [" ".join(map(str, item)) for item in zip(*cc_all_predictions['results'][setid])]
+                cc_outputs = [f"{label} {output}" for label, output in zip(all_labels, cc_predictions)]
+                foutputs.write("\n".join(cc_outputs) + "\n")
 
 
 if __name__=="__main__":
