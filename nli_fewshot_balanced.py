@@ -31,33 +31,58 @@ def get_tokenized_dataset_nli_fewshot(raw_dataset, raw_train_dataset, tokenizer,
         pad_token_id = tokenizer.pad_token_id
         template = TASK2LABELSTRINGS[task][0]
         label_names = _label_names.split(",")
+        tok_x = tokenizer.encode("x", add_special_tokens=False)
+        tok_labels = [tokenizer.encode("x " + label_name, add_special_tokens=False)[len(tok_x):] for label_name in label_names]
+        tok_label_lens = [len(tok_label) for tok_label in tok_labels]
         num_classes = len(label_names)
         num_cf = len(cfs)
 
         premises = np.array(examples[textfield1])
         hypothesis = np.array(examples[textfield2])
         labels = np.array(examples[labelfield])
+        
 
         n = len(labels)
 
         # get few shot examples
-        few_shot_examples = np.empty((_k+1, _num_sets), dtype=object)
+        few_shot_examples = np.empty(((_k)+1, _num_sets), dtype=object)
         train_data = raw_train_dataset
         train_premises = np.array(train_data[textfield1])
         train_hypothesis = np.array(train_data[textfield2])
         train_labels = np.array(train_data[labelfield])
-        
+        premises_split_by_label = []
+        hypothesis_split_by_label = []
+        for _class in range(num_classes):
+            premises_split_by_label.append(np.array([train_premises[i] for i in range(len(train_premises)) if train_labels[i] == _class]))
+            hypothesis_split_by_label.append(np.array([train_hypothesis[i] for i in range(len(train_hypothesis)) if train_labels[i] == _class]))
+        print("OK1")
+        print(len(premises_split_by_label), len(premises_split_by_label[0]))
+        print(len(hypothesis_split_by_label), len(hypothesis_split_by_label[0]))
+        # input()
+        # for i in range(num_classes):
+        #     print(label_names[i])
+        #     for j in range(4):
+        #         print(premises_split_by_label[i][j], ",", hypothesis_split_by_label[i][j])
+        #         input()
+        #         # print()
+        #     print()
+        # print(premises_split_by_label[0][2])
+        # print(hypothesis_split_by_label[0][2])
+        # input()
         for i in range(_num_sets):
-            idxs = np.random.choice(range(0, len(train_premises)), _k, replace=False)
+            idxs = [np.random.choice(range(0, len(premises_split_by_label[l])), _k, replace=False) for l in range(num_classes)]
             few_shot = {}
-            few_shot["premise"] = train_premises[idxs]
-            few_shot["hypothesis"] = train_hypothesis[idxs]
-            few_shot["label"] = train_labels[idxs]
+            few_shot["premise"] = [premises_split_by_label[l][idxs[l]] for l in range(num_classes)]
+            few_shot["hypothesis"] = [hypothesis_split_by_label[l][idxs[l]] for l in range(num_classes)]
+            # few_shot["label"] = train_labels[idxs]
             few_shot_strs = np.empty((_k), dtype=object)
-            
+            # print("OK2")
             for j in range(_k):
-                few_shot_strs[j] = template.format(premise=few_shot["premise"][j], hypothesis=few_shot["hypothesis"][j], label=label_names[few_shot["label"][j]])
-            
+                few_shot_strs[j] = ""
+                for l in range(num_classes):
+                    few_shot_strs[j] += template.format(premise=few_shot["premise"][l][j], hypothesis=few_shot["hypothesis"][l][j], label=label_names[l]) + "\n\n"
+            # print(few_shot_strs)
+            # input()
             for num_examples in range(_k+1):
                 example_idxs = np.random.choice(range(0, _k), num_examples, replace=False)
                 few_shot_strs_num_examples = few_shot_strs[example_idxs]
@@ -65,28 +90,37 @@ def get_tokenized_dataset_nli_fewshot(raw_dataset, raw_train_dataset, tokenizer,
                 tmp_str = ""
                     
                 for k in range(num_examples):
-                    tmp_str += few_shot_strs_num_examples[k] + "\n\n"
+                    tmp_str += few_shot_strs_num_examples[k]
+                # print(tmp_str)
+                # input()
                 few_shot_examples[num_examples, i] = tmp_str
+        # print("OK3")
+        # for i in range(_k+1):
+        #     print(i)
+        #     for j in range(_num_sets):
+        #         print(few_shot_examples[i, j])
+                # input()
+            # print()
+        # print(few_shot_examples)
+        # print(len(few_shot_examples), len(few_shot_examples[0]))
+        tokens = np.full((n, _k+1, num_classes, _num_sets), None)
+        cf_tokens = np.full((n, _k+1, num_classes, _num_sets, num_cf), None)
+        attention_masks = np.full((n, _k+1, num_classes, _num_sets), None)
+        cf_attention_masks = np.full((n, _k+1, num_classes, _num_sets, num_cf), None)
+        label_masks = np.full((n, _k+1, num_classes, _num_sets), None)
+        cf_label_masks = np.full((n, _k+1, num_classes, _num_sets, num_cf), None)
         
-        total_examples = _num_sets
-        tokens = np.full((n, _k+1, num_classes, total_examples), None)
-        cf_tokens = np.full((n, _k+1, num_classes, total_examples, num_cf), None)
-        attention_masks = np.full((n, _k+1, num_classes, total_examples), None)
-        cf_attention_masks = np.full((n, _k+1, num_classes, total_examples, num_cf), None)
-        label_masks = np.full((n, _k+1, num_classes, total_examples), None)
-        cf_label_masks = np.full((n, _k+1, num_classes, total_examples, num_cf), None)
-        tok_x = tokenizer.encode("x", add_special_tokens=False)
         for i in range(n):
-            quoted_premise = premises[i]
-            quoted_hypothesis = hypothesis[i]
+            premise = premises[i]
+            hyp = hypothesis[i]
             for num_examples in range(_k+1):
                 for j in range(num_classes):
                     label = label_names[j]
                      
-                    tokenized_label = tokenizer.encode("x " + label, add_special_tokens=False)[len(tok_x):]
-                    for k in range(total_examples):
-                        string = few_shot_examples[num_examples, k] + template.format(premise=quoted_premise, hypothesis=quoted_hypothesis, label=label)
-                        
+                    tokenized_label = tok_labels[j]
+                    for k in range(_num_sets):
+                        string = few_shot_examples[num_examples, k] + template.format(premise=premise, hypothesis=hyp, label=label)
+                        # print(string)
                         tmp_tok = tokenizer(string)
                         tokens[i, num_examples, j, k] = np.array(tmp_tok['input_ids'])
                         attention_masks[i, num_examples, j, k] = np.array(tmp_tok['attention_mask'])
@@ -95,10 +129,14 @@ def get_tokenized_dataset_nli_fewshot(raw_dataset, raw_train_dataset, tokenizer,
                         idx = len(tokenized_label)
                         tmp_label_mask[-idx:] = 1
                         label_masks[i, num_examples, j, k] = tmp_label_mask
+                        # assert np.sum(label_masks[i, num_examples, j, k]) == tok_label_lens[j]
+                        # tmp_prd = (label_masks[i, num_examples, j, k] * tokens[i, num_examples, j, k])
+                        
 
                         ## do the cf string now
                         for c in range(num_cf):
                             cf_string = few_shot_examples[num_examples, k] + template.format(premise=cfs[c], hypothesis=cfs[c], label=label)
+                            # print(cf_string)
 
                             cf_tmp_tok = tokenizer(cf_string)
                             cf_tokens[i, num_examples, j, k, c] = np.array(cf_tmp_tok['input_ids'])
@@ -108,67 +146,64 @@ def get_tokenized_dataset_nli_fewshot(raw_dataset, raw_train_dataset, tokenizer,
                             idx = len(tokenized_label)
                             cf_tmp_label_mask[-idx:] = 1
                             cf_label_masks[i, num_examples, j, k, c] = cf_tmp_label_mask
-                            # print(cf_string)
-                            # input()
 
-                        # if i == 5 and num_examples in (1, 7) and k in (1, 5):
-                        # print(i, num_examples, j, k)
-                        # print(tokens[i, num_examples, j, k])
-                        # print(attention_masks[i, num_examples, j, k])
-                        # print(label_masks[i, num_examples, j, k])
-                        # print(label)
-                        # print(tokenized_label)
-                        # print(idx)
-                        # tmp = np.array(label_masks[i, num_examples, j, k]) * np.array(tokens[i, num_examples, j, k])
-                        # print(tokenizer.decode(tmp[tmp != 0]))
-
-                        # print(label)
-                        # print(i, num_examples, j, k)
-                        # print(string)
-                        # print()
-                        # input()
         max_len = 0 # it's safe to assume that the max_len for the actual strings will be greater than the max_len for the cf, as we are replacing the hypothesis and premise by one word
-        
+        print("past assertions")
+        # input()
         for i in range(n):
             for num_examples in range(_k+1):
                 for j in range(num_classes):
-                    for k in range(total_examples):
+                    for k in range(_num_sets):
                         curr_length = len(tokens[i, num_examples, j, k])
                         if curr_length > max_len:
                             max_len = curr_length
         
-        padded_tokens = np.full((n, _k+1, num_classes, total_examples, max_len), pad_token_id)
-        padded_attention_mask = np.full((n, _k+1, num_classes, total_examples, max_len), 0)
-        padded_label_mask = np.full((n, _k+1, num_classes, total_examples, max_len), 0)
+        padded_tokens = np.full((n, _k+1, num_classes, _num_sets, max_len), pad_token_id)
+        padded_attention_mask = np.full((n, _k+1, num_classes, _num_sets, max_len), 0)
+        padded_label_mask = np.full((n, _k+1, num_classes, _num_sets, max_len), 0)
 
-        cf_padded_tokens = np.full((n, _k+1, num_classes, total_examples, num_cf, max_len), pad_token_id)
-        cf_padded_attention_mask = np.full((n, _k+1, num_classes, total_examples, num_cf, max_len), 0)
-        cf_padded_label_mask = np.full((n, _k+1, num_classes, total_examples, num_cf, max_len), 0)
+        cf_padded_tokens = np.full((n, _k+1, num_classes, _num_sets, num_cf, max_len), pad_token_id)
+        cf_padded_attention_mask = np.full((n, _k+1, num_classes, _num_sets, num_cf, max_len), 0)
+        cf_padded_label_mask = np.full((n, _k+1, num_classes, _num_sets, num_cf, max_len), 0)
+
                 
         for i in range(n):
             for num_examples in range(_k+1):
                 for j in range(num_classes):
-                    for k in range(total_examples):
+                    for k in range(_num_sets):
                         padded_tokens[i, num_examples, j, k, :len(tokens[i, num_examples, j, k])] = tokens[i, num_examples, j, k]
                         padded_attention_mask[i, num_examples, j, k, :len(attention_masks[i, num_examples, j, k])] = attention_masks[i, num_examples, j, k]
                         padded_label_mask[i, num_examples, j, k, :len(label_masks[i, num_examples, j, k])] = label_masks[i, num_examples, j, k]
+
+                        # test
+                        test_prd = padded_label_mask[i, num_examples, j, k, :] * padded_tokens[i, num_examples, j, k, :]
+
+                        assert (test_prd[test_prd != 0] == tok_labels[j]).all()
+                        # print(tokenizer.decode(test_prd[test_prd != 0]))
+                        
 
                         for c in range(num_cf):
                             cf_padded_tokens[i, num_examples, j, k, c, :len(cf_tokens[i, num_examples, j, k, c])] = cf_tokens[i, num_examples, j, k, c]
                             cf_padded_attention_mask[i, num_examples, j, k, c, :len(cf_attention_masks[i, num_examples, j, k, c])] = cf_attention_masks[i, num_examples, j, k, c]
                             cf_padded_label_mask[i, num_examples, j, k, c, :len(cf_label_masks[i, num_examples, j, k, c])] = cf_label_masks[i, num_examples, j, k, c]
+                            
+                            test_prd_cf = cf_padded_label_mask[i, num_examples, j, k, c, :] * cf_padded_tokens[i, num_examples, j, k, c, :]
+
+                            assert (test_prd_cf[test_prd_cf != 0] == tok_labels[j]).all()
+        print("passed assertions")
         # print("%%%%%%%")
         # print(labels[:10])
         # print(padded_tokens[:10, 0, 0, :])
         tokenized_dataset = {
-            'input_ids': torch.from_numpy(padded_tokens), # (n, num_classes, total_examples, maxlen)
-            'attention_mask': torch.from_numpy(padded_attention_mask), # (n, num_classes, total_examples, maxlen)
-            'label_mask': torch.from_numpy(padded_label_mask), # (n, num_classes, total_examples, maxlen)
+            'input_ids': torch.from_numpy(padded_tokens),
+            'attention_mask': torch.from_numpy(padded_attention_mask),
+            'label_mask': torch.from_numpy(padded_label_mask),
             'labels': torch.from_numpy(labels), # (n)
-            'cf_input_ids': torch.from_numpy(cf_padded_tokens), # (n, num_classes, total_examples, c, maxlen)
-            'cf_attention_mask': torch.from_numpy(cf_padded_attention_mask), # (n, num_classes, total_examples, c, maxlen)
-            'cf_label_mask': torch.from_numpy(cf_padded_label_mask), # (n, num_classes, total_examples, c, maxlen)
+            'cf_input_ids': torch.from_numpy(cf_padded_tokens),
+            'cf_attention_mask': torch.from_numpy(cf_padded_attention_mask),
+            'cf_label_mask': torch.from_numpy(cf_padded_label_mask),
         }
+        print("***")
         for key, val in tokenized_dataset.items():
             print(key, ": ", val.shape)
         # print("***************")

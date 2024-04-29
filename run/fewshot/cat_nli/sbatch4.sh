@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=4-cat-nli-fewshot
-#SBATCH --partition=gpu-l40
+#SBATCH --partition=gpu-a40
 #SBATCH --account=ark
 #SBATCH --nodes=1
 #SBATCH --mem=64G
@@ -10,5 +10,5 @@
 #SBATCH --mail-user=hsethu@uw.edu
 
 # I use source to initialize conda into the right environment.
-source activate testenv4
+source activate testenv5
 bash run/fewshot/cat_nli/run_all4.sh

@@ -10,7 +10,7 @@ EXAMPLEFORMAT_SPACE2NOTENTAIL = " This premise: \"{text1}\" does not entail  thi
 
 TASK2LABELSTRINGS = {
     "rte_fewshot": [
-        "{premise}\nquestion: {hypothesis}. True or False? answer: {label}"
+        "{premise}\nquestion: {hypothesis} true or false? answer: {label}"
     ],
     "sick_fewshot": [
         "{premise}\nquestion: {hypothesis}. entailment, neutral, or contradiction? answer: {label}"
@@ -20,6 +20,9 @@ TASK2LABELSTRINGS = {
     ],
     "wnli_fewshot": [
         "{premise}\nquestion: {hypothesis}. True or False? answer: {label}"
+    ],
+    "mnli_fewshot": [
+        "{premise}\nquestion: {hypothesis}. entailment, neutral, or contradiction answer: {label}"
     ],
     "arc_easy_fewshot": [
         "Question:\n{question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
@@ -34,30 +37,41 @@ TASK2LABELSTRINGS = {
         "{label}: {choice}\n"
     ],
     "commonsense_qa_fewshot": [
-        "Question:\n{question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
+        "Question: {question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
         "{label}: {choice}\n"
     ],
     "copa_fewshot": [
-        "Question:\n{question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
+        "Question: {question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
         "{label}: {choice}\n"
     ],
     "piqa_fewshot": [
-        "Question:\n{question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
+        "Question: {question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
         "{label}: {choice}\n"
     ],
     "winogrande_fewshot": [
-        "Question:\n{question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
+        "Question: {question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
         "{label}: {choice}\n"
     ],
     "mmlu_fewshot": [
-        "Question:\n{question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
+        "Question: {question}\nChoices:\n{choices}Answer: {label}",
         "{label}: {choice}\n"
     ],
     "boolq_fewshot": [
         "Passage:\n{passage}\nQuestion:\n{question}\nChoices:\n{choices}Answer: {label}", # choices formatted as "{1}. {choice1}\n{2}. {choice2}"
         "{label}: {choice}\n"
-    ]
-    
+    ],
+    "sst2_fewshot": [
+        "Statement: {sentence}\nSentiment: {label}"
+    ],
+    "rte_hGivenP_fewshot": [
+        "{premise}\ntrue or false? answer: true. question: {hypothesis}",
+        "{premise}\ntrue or false? answer: false. question: {hypothesis}",
+    ],
+    "sick_hGivenP_fewshot": [
+        "This: {premise}, entails this: {hypothesis}",
+        "The premise: {premise} is neutral to the hypothesis: {hypothesis}",
+        "This: {premise}, contradicts this: {hypothesis}",
+    ],
 }
 
 TASK2ARGS ={

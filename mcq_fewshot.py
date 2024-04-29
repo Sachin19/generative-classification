@@ -25,9 +25,9 @@ from dataset_loaders import TASK2LOADER, TOKEN
 import logging
 
 
-def get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer, question="sentence1", choices_string="choice1,choice2", labelfield="label", label2id=None, _task="", _k=10, _num_sets=8, possible_labels_string="", create=False, preprocess_path="", want_choice=True, few_shot_seed=2024):
+def get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer, question="sentence1", choices_string="choice1,choice2", labelfield="label", label2id=None, _task="", _k=10, _num_sets=8, possible_labels_string="", create=False, preprocess_path="", want_choice=True, few_shot_seed=2024, cfs=['N/A', '', '[MASK]']):
     def preprocess_function(examples): 
-        np.random.seed(few_shot_seed)   
+        np.random.seed(few_shot_seed)
         choices = choices_string.split(",")
         examples_choices = [examples[choice] for choice in choices]
         examples_questions = examples[question]
@@ -41,6 +41,7 @@ def get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer,
         num_classes = len(examples_choices)
 
         all_choices = np.array(examples_choices).T
+        num_cf = len(cfs)
 
         # prepare fewshot examples
         few_shot_examples = np.empty((_k+1, _num_sets), dtype=object)
@@ -82,14 +83,20 @@ def get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer,
         tokens = np.full((n, _k+1, num_classes, total_examples), None)
         attention_masks = np.full((n, _k+1, num_classes, total_examples), None)
         label_masks = np.full((n, _k+1, num_classes, total_examples), None)
+
+        cf_tokens = np.full((n, _k+1, num_classes, total_examples), None)
+        cf_attention_masks = np.full((n, _k+1, num_classes, total_examples), None)
+        cf_label_masks = np.full((n, _k+1, num_classes, total_examples), None)
         tok_x = tokenizer.encode("x", add_special_tokens=False)
 
+        quoted_cf_choices = ["".join([choice_template.format(label=cfs[choice], choice=all_choices[i, choice])])]
         for i in range(n):
             quoted_question = examples_questions[i]
             tmp_choices = ""
             for choice in range(num_classes):
                 tmp_choices += choice_template.format(label=possible_labels[choice], choice=all_choices[i, choice])
             quoted_choices = tmp_choices
+
             for num_examples in range(_k+1):
                 for j in range(num_classes):
                     if want_choice:
@@ -108,6 +115,20 @@ def get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer,
                         idx = len(tokenized_label)
                         tmp_label_mask[-idx:] = 1
                         label_masks[i, num_examples, j, k] = tmp_label_mask
+
+                        for c in range(num_cf):
+                            cf_string = few_shot_examples[num_examples, k] + template.format(question=cfs[c], choices=cfs[c], label=label)
+                            # print(cf_string)
+
+                            cf_tmp_tok = tokenizer(cf_string)
+                            cf_tokens[i, num_examples, j, k, c] = np.array(cf_tmp_tok['input_ids'])
+                            cf_attention_masks[i, num_examples, j, k, c] = np.array(cf_tmp_tok['attention_mask'])
+                            cf_tmp_label_mask = np.zeros_like(cf_tokens[i, num_examples, j, k, c])
+
+                            idx = len(tokenized_label)
+                            cf_tmp_label_mask[-idx:] = 1
+                            cf_label_masks[i, num_examples, j, k, c] = cf_tmp_label_mask
+
                         # print(i, num_examples, j, k)
                         # print(tokens[i, num_examples, j, k])
                         # # print(attention_masks[i, num_examples, j, k])
@@ -115,7 +136,7 @@ def get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer,
                         # # print(label)
                         # print(tokenized_label)
                         # # print(idx)
-                        tmp = np.array(label_masks[i, num_examples, j, k]) * np.array(tokens[i, num_examples, j, k])
+                        # tmp = np.array(label_masks[i, num_examples, j, k]) * np.array(tokens[i, num_examples, j, k])
                         # print(tokenizer.decode(tmp[tmp != 0]))
 
                         # print("{" + string+"}")
@@ -135,7 +156,10 @@ def get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer,
         padded_tokens = np.full((n, _k+1, num_classes, total_examples, max_len), pad_token_id)
         padded_attention_mask = np.full((n, _k+1, num_classes, total_examples, max_len), 0)
         padded_label_mask = np.full((n, _k+1, num_classes, total_examples, max_len), 0)
-                
+        cf_padded_tokens = np.full((n, _k+1, num_classes, total_examples, num_cf, max_len), pad_token_id)
+        cf_padded_attention_mask = np.full((n, _k+1, num_classes, total_examples, num_cf, max_len), 0)
+        cf_padded_label_mask = np.full((n, _k+1, num_classes, total_examples, num_cf, max_len), 0)
+
         for i in range(n):
             for num_examples in range(_k+1):
                 for j in range(num_classes):
@@ -144,13 +168,33 @@ def get_tokenized_dataset_mcq_fewshot(raw_dataset, raw_train_dataset, tokenizer,
                         padded_attention_mask[i, num_examples, j, k, :len(attention_masks[i, num_examples, j, k])] = attention_masks[i, num_examples, j, k]
                         padded_label_mask[i, num_examples, j, k, :len(label_masks[i, num_examples, j, k])] = label_masks[i, num_examples, j, k]
 
+                        # test
+                        test_prd = padded_label_mask[i, num_examples, j, k, :] * padded_tokens[i, num_examples, j, k, :]
+
+                        assert (test_prd[test_prd != 0] == tok_labels[j]).all()
+
+                        for c in range(num_cf):
+                            cf_padded_tokens[i, num_examples, j, k, c, :len(cf_tokens[i, num_examples, j, k, c])] = cf_tokens[i, num_examples, j, k, c]
+                            cf_padded_attention_mask[i, num_examples, j, k, c, :len(cf_attention_masks[i, num_examples, j, k, c])] = cf_attention_masks[i, num_examples, j, k, c]
+                            cf_padded_label_mask[i, num_examples, j, k, c, :len(cf_label_masks[i, num_examples, j, k, c])] = cf_label_masks[i, num_examples, j, k, c]
+                            
+                            test_prd_cf = cf_padded_label_mask[i, num_examples, j, k, c, :] * cf_padded_tokens[i, num_examples, j, k, c, :]
+
+                            assert (test_prd_cf[test_prd_cf != 0] == tok_labels[j]).all()
+
         tokenized_dataset = {
             'input_ids': torch.from_numpy(padded_tokens), # (n, num_classes, total_examples, maxlen)
             'attention_mask': torch.from_numpy(padded_attention_mask), # (n, num_classes, total_examples, maxlen)
             'label_mask': torch.from_numpy(padded_label_mask), # (n, num_classes, total_examples, maxlen)
             'labels': torch.from_numpy(labels), # (n)
+            'cf_input_ids': torch.from_numpy(cf_padded_tokens),
+            'cf_attention_mask': torch.from_numpy(cf_padded_attention_mask),
+            'cf_label_mask': torch.from_numpy(cf_padded_label_mask),
         }
 
+        print("***")
+        for key, val in tokenized_dataset.items():
+            print(key, ": ", val.shape)
 
         return tokenized_dataset
 

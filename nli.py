@@ -1,6 +1,10 @@
-# change to contradict
-# compare with other paper
-# another model
+import sys
+print("*************")
+# print(sys.path)
+unwanted_path = '/mmfs1/home/hsethu/.local/lib/python3.9/site-packages'
+if unwanted_path in sys.path:
+    sys.path.remove(unwanted_path)
+
 import os
 from dataclasses import dataclass, field
 from typing import Optional, Literal
@@ -103,11 +107,11 @@ class DataCollatorForNLI:
         n, num_class, num_label_strings, length = tmp.shape
         
         batch = { # make the dictionary
-                    'input_ids': tmp.view(-1, length).to(self.device), #(B, num_class,num_labelstrings, length)
-                    'attention_mask': torch.stack(new_features['attention_mask'], dim=0).view(-1, length).to(self.device),
+                    'input_ids': tmp.view(n, num_class, num_label_strings, length).to(self.device), #(B, num_class,num_labelstrings, length)
+                    'attention_mask': torch.stack(new_features['attention_mask'], dim=0).view(n, num_class, num_label_strings, length).to(self.device),
                     'labels': labels.to(self.device),
                 }
-        batch['label_mask'] = torch.stack(new_features['label_mask'], dim=0).view(-1, length).to(self.device)
+        batch['label_mask'] = torch.stack(new_features['label_mask'], dim=0).view(n, num_class, num_label_strings, length).to(self.device)
         
         return batch
 
@@ -128,15 +132,20 @@ def get_tokenized_dataset(raw_dataset, tokenizer, textfield1="sentence1", textfi
         label_masks = np.full((n, num_classes, num_labelstrings), None)
         
         tok_x = tokenizer.encode("x", add_special_tokens=False)
+        
+        # maybe = 1
 
         for i in range(n):
             for j in range(num_classes):
-                quoted_target = "\"" + examples[target_text][i] + "\""
+                quoted_target = "\"" + examples[target_text][i] + "\"" + tokenizer.eos_token
                 quoted_masked = "\"" + examples[masked_text][i] + "\""
 
-                tokenized_target = tokenizer.encode("x " + quoted_target)[len(tok_x):]
+                tokenized_target = tokenizer.encode("x " + quoted_target, add_special_tokens=False)[len(tok_x):]
                 for k in range(num_labelstrings):
-                    tmp_tok = tokenizer(all_labelstrings[j][k].format(text1=quoted_masked, text2=quoted_target))
+                    string = all_labelstrings[j][k].format(text1=quoted_masked, text2=quoted_target)
+                    # print(string)
+                    # input()
+                    tmp_tok = tokenizer(string)
                     tokens[i, j, k] = np.array(tmp_tok['input_ids'])
                     attention_masks[i, j, k] = np.array(tmp_tok['attention_mask'])
                     tmp_label_mask = np.zeros_like(tokens[i, j, k])
@@ -144,6 +153,9 @@ def get_tokenized_dataset(raw_dataset, tokenizer, textfield1="sentence1", textfi
                     idx = len(tokenized_target)
                     tmp_label_mask[-(idx):] = 1
                     label_masks[i, j, k] = tmp_label_mask
+                    tmp_prd = label_masks[i, j, k] * tokens[i, j, k]
+                    # print(tokenizer.decode(tmp_prd[tmp_prd != 0]))
+                    # input()
 
 
         max_len = 0
@@ -164,8 +176,17 @@ def get_tokenized_dataset(raw_dataset, tokenizer, textfield1="sentence1", textfi
             for j in range(num_classes):
                 for k in range(num_labelstrings):
                     padded_tokens[i, j, k, :len(tokens[i, j, k])] = tokens[i, j, k]
+                    
                     padded_attention_mask[i, j, k, :len(attention_masks[i, j, k])] = attention_masks[i, j, k]
                     padded_label_mask[i, j, k, :len(label_masks[i, j, k])] = label_masks[i, j, k]
+
+                    # if i in [1, 3, 10] and k == 0:
+                    #     # print("*******")
+                    #     # print(padded_tokens[i, j, k, :len(tokens[i, j, k])])
+                    #     # print(padded_label_mask[i, j, k, :len(label_masks[i, j, k])])
+                    #     tmp_prd = padded_tokens[i, j, k, :] * padded_label_mask[i, j, k, :]
+                    #     # print(tokenizer.decode(tmp_prd[tmp_prd != 0]))
+                        # print("******")
                     
         if label2id is not None:
             labels = np.array([label2id[label] for label in examples[labelfield]])
@@ -214,21 +235,27 @@ def get_tokenized_dataset(raw_dataset, tokenizer, textfield1="sentence1", textfi
     return tokenized_dataset
 
 
-def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
+def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings, device="cuda"):
+    if not args.batch_by_labelstring:
+        _, _, _, length = batch['input_ids'].shape
+        batch['input_ids'] = batch['input_ids'].view(-1, length).to(device)
+        batch['attention_mask'] = batch['attention_mask'].view(-1, length).to(device)
+        label_mask = label_mask.view(-1, length).to(device)
+
     outputs = model(**batch)
     logits = outputs.logits
     # print(logits.shape)
     shift_logprobs = torch.nn.functional.log_softmax(logits[..., :-1, :], dim=-1).contiguous()
-    if args.model == "google/ul2":
-        shift_target = batch['decoder_input_ids'][..., 1:].contiguous()
-    else: 
-        shift_target = batch['input_ids'][..., 1:].contiguous()
+    # if args.model == "google/ul2":
+    #     shift_target = batch['decoder_input_ids'][..., 1:].contiguous()
+    # else: 
+    shift_target = batch['input_ids'][..., 1:].contiguous()
     # print(shift_target.shape)
     nll = torch.nn.functional.nll_loss(shift_logprobs.view(-1, shift_logprobs.size(-1)), shift_target.view(-1), reduction="none", ignore_index=tokenizer.pad_token_id).view(-1, shift_target.size(-1)) # to ensure they correspond and pick the correct word from the dist. reduction is to not do anything extra
 
     nll = nll * label_mask[..., 1:]
     
-    deno = (shift_target.ne(tokenizer.pad_token_id).float()).sum(dim=-1) # just to account for the lengths, not too important as lengths of x are the same
+    deno = (label_mask[..., 1:]).sum(dim=-1) # just to account for the lengths, not too important as lengths of x are the same
     # input(deno)
     nll = nll.sum(dim=-1)/deno # actual summation
     # logging.info(nll)
@@ -241,6 +268,9 @@ def get_nll(model, tokenizer, batch, label_mask, num_labels, num_labelstrings):
 
 def main():
     # print(TASK2LABELSTRINGS)
+    if args.model in ("meta-llama/Llama-2-70b-hf", "huggyllama/llama-30b", "EleutherAI/gpt-neox-20b"):
+        print("batch by labelstring")
+        args.batch_by_labelstring = True
     try:
         with open(args.results_file) as fresults_exist:
             if len(fresults_exist.readlines()) >= args.num_runs and not args.overwrite:
@@ -261,57 +291,74 @@ def main():
     tokenizer.pad_token_id = tokenizer.eos_token_id
     # print("OK1")
     ############ create the model
-    if args.model_dtype == "bit4":
-        # print("bit4")
-        model = AutoModelForCausalLM.from_pretrained(
-                args.model, cache_dir="models/", trust_remote_code=True,
-                torch_dtype=torch.bfloat16,
-                token=TOKEN,
-                # use_flash_attention_2=True,
-                quantization_config=BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_compute_dtype=torch.bfloat16,
-                    #bnb_4bit_use_double_quant=True,
-                    #bnb_4bit_quant_type='nf4'
-                )
-            ) 
-        # model = AutoModelForCausalLM.from_pretrained(args.model, device_map="auto", load_in_4bit=True, cache_dir="models/")
-        device = model.device
-        # print(device)
-    elif args.model_dtype == "bit8":
-        # print("bit8")
-        model = AutoModelForCausalLM.from_pretrained(args.model, device_map="cuda", load_in_8bit=True, cache_dir="models/", token=TOKEN)
-        device = model.device
+    if args.model == "meta-llama/Llama-2-70b-hf" or args.model == "huggyllama/llama-30b":
+        print("Extra large model")
+        model = AutoModelForCausalLM.from_pretrained(args.model, token=TOKEN, quantization_config=BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        #bnb_4bit_use_double_quant=True,
+                        #bnb_4bit_quant_type='nf4'
+                    ), cache_dir="models/", device_map="auto")
+    elif args.model == "EleutherAI/gpt-neox-20b":
+        print("large model")
+        model = AutoModelForCausalLM.from_pretrained(args.model, token=TOKEN, quantization_config=BitsAndBytesConfig(
+                        load_in_8bit=True,
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        #bnb_4bit_use_double_quant=True,
+                        #bnb_4bit_quant_type='nf4'
+                    ), cache_dir="models/", device_map="auto")
     else:
-        # print("else")
-        if args.model in ["EleutherAI/pythia-6.9b"]:
-            args.device_map = True
-        
-        if not args.device_map:
-            if args.model == "google/ul2":
-                # print("HELLO!")
-                model = T5ForConditionalGeneration.from_pretrained("google/ul2", cache_dir="models/", token=TOKEN)
-            else:
-                model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", token=TOKEN)#, device_map="auto")
+        if args.model_dtype == "bit4":
+            # print("bit4")
+            model = AutoModelForCausalLM.from_pretrained(
+                    args.model, cache_dir="models/", trust_remote_code=True,
+                    torch_dtype=torch.bfloat16,
+                    token=TOKEN,
+                    # use_flash_attention_2=True,
+                    quantization_config=BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_compute_dtype=torch.bfloat16,
+                        #bnb_4bit_use_double_quant=True,
+                        #bnb_4bit_quant_type='nf4'
+                    )
+                ) 
+            # model = AutoModelForCausalLM.from_pretrained(args.model, device_map="auto", load_in_4bit=True, cache_dir="models/")
+            device = model.device
+            # print(device)
+        elif args.model_dtype == "bit8":
+            # print("bit8")
+            model = AutoModelForCausalLM.from_pretrained(args.model, device_map="cuda", load_in_8bit=True, cache_dir="models/", token=TOKEN)
+            device = model.device
         else:
-            if args.model == "google/ul2":
-                # print("HELLO")
-                model = T5ForConditionalGeneration.from_pretrained("google/ul2", cache_dir="models/", device_map="auto", token=TOKEN)
+            # print("else")
+            if args.model in ["EleutherAI/pythia-6.9b"]:
+                args.device_map = True
+            
+            if not args.device_map:
+                if args.model == "google/ul2":
+                    # print("HELLO!")
+                    model = T5ForConditionalGeneration.from_pretrained("google/ul2", cache_dir="models/", token=TOKEN)
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", token=TOKEN)#, device_map="auto")
             else:
-                model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", device_map="auto", token=TOKEN)
-        # model = AutoModelForCausalLM.from_pretrained('mosaicml/mpt-1b-redpajama-200b', trust_remote_code=True, attn_impl='triton')
-        logging.info("model loaded on cpu")
-        if args.model_dtype == "bf16":
-            model.to(dtype=torch.bfloat16)
-        elif args.model_dtype == "fp16":
-            model.half()
+                if args.model == "google/ul2":
+                    # print("HELLO")
+                    model = T5ForConditionalGeneration.from_pretrained("google/ul2", cache_dir="models/", device_map="auto", token=TOKEN)
+                else:
+                    model = AutoModelForCausalLM.from_pretrained(args.model, cache_dir="models/", device_map="auto", token=TOKEN)
+            # model = AutoModelForCausalLM.from_pretrained('mosaicml/mpt-1b-redpajama-200b', trust_remote_code=True, attn_impl='triton')
+            logging.info("model loaded on cpu")
+            if args.model_dtype == "bf16":
+                model.to(dtype=torch.bfloat16)
+            elif args.model_dtype == "fp16":
+                model.half()
 
-        if args.bettertransformer:
-            model = model.to_bettertransformer()
+            if args.bettertransformer:
+                model = model.to_bettertransformer()
 
-        if not args.device_map:
-            model.to(device)
-        logging.info("model loaded on gpu")
+            if not args.device_map:
+                model.to(device)
+            logging.info("model loaded on gpu")
 
     model.eval() # set on evaluation mode
     logging.info(f"{args.model} loaded")
@@ -342,7 +389,7 @@ def main():
     #     alllabelstrings_tokenized.append(labelstrings_tokenized)
     # # input()
     # ############
-    print(TASK2LABELSTRINGS[args.task])
+    # print(TASK2LABELSTRINGS[args.task])
     if task_items[0] in TASK2LOADER: # not too important
         loader, params = TASK2LOADER[task_items[0]]
         params += task_items[1:]
@@ -359,8 +406,12 @@ def main():
             raw_dataset = create_cat(args.dataset, args.data_dir, split=args.split, text1=args.textfield1, text2=args.textfield2, labels=args.labelfield, seed=args.cat_seed)
         else:
             raw_dataset = load_dataset(args.dataset, args.data_dir, split=args.split, data_files=data_files, cache_dir="datasets")
-        if len(raw_dataset) > 1000:
-            raw_dataset = Dataset.from_dict(raw_dataset.shuffle(seed=HF_SHUFFLE_SEED)[:1000])
+        test_cap = 1000
+        if args.model in ("meta-llama/Llama-2-70b-hf", "huggyllama/llama-30b", "EleutherAI/gpt-neox-20b"):
+            print("scaling down dataset")
+            test_cap = 100
+        if len(raw_dataset) > test_cap:
+            raw_dataset = Dataset.from_dict(raw_dataset.shuffle(seed=HF_SHUFFLE_SEED)[:test_cap])
 
     # tokenized_dataset = get_tokenized_dataset(raw_dataset, "sentence", "label")
     label2id = None

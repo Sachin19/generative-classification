@@ -178,8 +178,8 @@ def get_nll(model, tokenizer, batch, label_mask):
     # print("inside",nll)
     nll = nll * label_mask[..., 1:]
     # print(nll)
-    # deno = label_mask[..., 1:].sum(dim=-1)
-    nll = nll.sum(dim=-1) #/deno
+    deno = label_mask[..., 1:].sum(dim=-1)
+    nll = nll.sum(dim=-1)/deno
     # print(nll.size())
     # input()
     # # deno = (shift_target.ne(tokenizer.pad_token_id).float() * label_mask[..., 1:]).sum(dim=-1)

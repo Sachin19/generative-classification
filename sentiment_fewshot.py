@@ -1,0 +1,244 @@
+import os
+from dataclasses import dataclass, field
+from typing import Optional, Literal
+from tqdm import tqdm
+import json
+import re
+
+import numpy as np
+from sklearn.metrics import confusion_matrix
+
+import torch
+from torch.utils.data import DataLoader
+
+from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorWithPadding, HfArgumentParser, BitsAndBytesConfig, T5ForConditionalGeneration
+from datasets import load_dataset, Dataset
+
+# quantization_config = BitsAndBytesConfig(llm_int8_enable_fp32_cpu_offload=True)
+
+from config_channel_ablate import TASK2LABELSTRINGS as TASK2ABLATELABELSTRINGS
+from config_fewshot_new import TASK2LABELSTRINGS, EXAMPLEFORMAT2ENTAIL, EXAMPLEFORMAT2NOTENTAIL, EXAMPLEFORMAT_SPACE2ENTAIL, EXAMPLEFORMAT_SPACE2NOTENTAIL#, EXAMPLEFORMAT2, EXAMPLEFORMAT2_SPACE
+
+from dataset_loaders import TASK2LOADER, TOKEN
+
+import logging
+
+def get_tokenized_dataset_sentiment_fewshot(raw_dataset, raw_train_dataset, tokenizer, textfield="sentence", labelfield="label", label2id=None, task="", _k=2, _num_sets=4, _label_names="", create=False, preprocess_path="", few_shot_seed=2024, cfs=['N/A', '', '[MASK]']):
+    def preprocess_function(examples):  
+        np.random.seed(few_shot_seed)          
+        print("creating sentiment")
+        print("**************** creating sentiment")
+        pad_token_id = tokenizer.pad_token_id
+        template = TASK2LABELSTRINGS[task][0]
+        label_names = _label_names.split(",")
+        tok_x = tokenizer.encode("x", add_special_tokens=False)
+        tok_labels = [tokenizer.encode("x " + label_name, add_special_tokens=False)[len(tok_x):] for label_name in label_names]
+        tok_label_lens = [len(tok_label) for tok_label in tok_labels]
+        num_classes = len(label_names)
+        num_cf = len(cfs)
+
+        sentences = np.array(examples[textfield])
+        labels = np.array(examples[labelfield])
+        
+        n = len(labels)
+
+        # get few shot examples
+        few_shot_examples = np.empty(((_k)+1, _num_sets), dtype=object)
+        train_data = raw_train_dataset
+        train_sentences = np.array(train_data[textfield])
+        train_labels = np.array(train_data[labelfield])
+        sentences_split_by_label = []
+        for _class in range(num_classes):
+            sentences_split_by_label.append(np.array([train_sentences[i] for i in range(len(train_sentences)) if train_labels[i] == _class]))
+        print("OK1")
+        print(len(sentences_split_by_label), len(sentences_split_by_label[0]))
+        # input()
+        # for i in range(num_classes):
+        #     print(label_names[i])
+        #     for j in range(4):
+        #         print(sentences_split_by_label[i][j])
+        #         input()
+        #         # print()
+        #     print()
+        # print(sentences_split_by_label[0][2])
+        # input()
+        for i in range(_num_sets):
+            idxs = [np.random.choice(range(0, len(sentences_split_by_label[l])), _k, replace=False) for l in range(num_classes)]
+            few_shot = {}
+            few_shot["sentence"] = [sentences_split_by_label[l][idxs[l]] for l in range(num_classes)]
+            # few_shot["label"] = train_labels[idxs]
+            few_shot_strs = np.empty((_k), dtype=object)
+            # print("OK2")
+            for j in range(_k):
+                few_shot_strs[j] = ""
+                for l in range(num_classes):
+                    few_shot_strs[j] += template.format(sentence=few_shot["sentence"][l][j], label=label_names[l]) + "\n\n"
+            # print(few_shot_strs)
+            # input()
+            for num_examples in range(_k+1):
+                example_idxs = np.random.choice(range(0, _k), num_examples, replace=False)
+                few_shot_strs_num_examples = few_shot_strs[example_idxs]
+
+                tmp_str = ""
+                    
+                for k in range(num_examples):
+                    tmp_str += few_shot_strs_num_examples[k]
+                # print(tmp_str)
+                # input()
+                few_shot_examples[num_examples, i] = tmp_str
+        # print("OK3")
+        # for i in range(_k+1):
+        #     print(i)
+        #     for j in range(_num_sets):
+        #         print(few_shot_examples[i, j])
+        #         input()
+        #     print()
+        # print(few_shot_examples)
+        # print(len(few_shot_examples), len(few_shot_examples[0]))
+        tokens = np.full((n, _k+1, num_classes, _num_sets), None)
+        cf_tokens = np.full((n, _k+1, num_classes, _num_sets, num_cf), None)
+        attention_masks = np.full((n, _k+1, num_classes, _num_sets), None)
+        cf_attention_masks = np.full((n, _k+1, num_classes, _num_sets, num_cf), None)
+        label_masks = np.full((n, _k+1, num_classes, _num_sets), None)
+        cf_label_masks = np.full((n, _k+1, num_classes, _num_sets, num_cf), None)
+        
+        for i in range(n):
+            sentence = sentences[i]
+            for num_examples in range(_k+1):
+                for j in range(num_classes):
+                    label = label_names[j]
+                     
+                    tokenized_label = tok_labels[j]
+                    for k in range(_num_sets):
+                        string = few_shot_examples[num_examples, k] + template.format(sentence=sentence, label=label)
+                        # print(string)
+                        tmp_tok = tokenizer(string)
+                        tokens[i, num_examples, j, k] = np.array(tmp_tok['input_ids'])
+                        attention_masks[i, num_examples, j, k] = np.array(tmp_tok['attention_mask'])
+                        tmp_label_mask = np.zeros_like(tokens[i, num_examples, j, k])
+                        
+                        idx = len(tokenized_label)
+                        tmp_label_mask[-idx:] = 1
+                        label_masks[i, num_examples, j, k] = tmp_label_mask
+                        # assert np.sum(label_masks[i, num_examples, j, k]) == tok_label_lens[j]
+                        # tmp_prd = (label_masks[i, num_examples, j, k] * tokens[i, num_examples, j, k])
+                        
+
+                        ## do the cf string now
+                        for c in range(num_cf):
+                            cf_string = few_shot_examples[num_examples, k] + template.format(sentence=cfs[c], label=label)
+                            # print(cf_string)
+
+                            cf_tmp_tok = tokenizer(cf_string)
+                            cf_tokens[i, num_examples, j, k, c] = np.array(cf_tmp_tok['input_ids'])
+                            cf_attention_masks[i, num_examples, j, k, c] = np.array(cf_tmp_tok['attention_mask'])
+                            cf_tmp_label_mask = np.zeros_like(cf_tokens[i, num_examples, j, k, c])
+
+                            idx = len(tokenized_label)
+                            cf_tmp_label_mask[-idx:] = 1
+                            cf_label_masks[i, num_examples, j, k, c] = cf_tmp_label_mask
+
+        max_len = 0 # it's safe to assume that the max_len for the actual strings will be greater than the max_len for the cf
+        print("past assertions")
+        # input()
+        for i in range(n):
+            for num_examples in range(_k+1):
+                for j in range(num_classes):
+                    for k in range(_num_sets):
+                        curr_length = len(tokens[i, num_examples, j, k])
+                        if curr_length > max_len:
+                            max_len = curr_length
+        
+        padded_tokens = np.full((n, _k+1, num_classes, _num_sets, max_len), pad_token_id)
+        padded_attention_mask = np.full((n, _k+1, num_classes, _num_sets, max_len), 0)
+        padded_label_mask = np.full((n, _k+1, num_classes, _num_sets, max_len), 0)
+
+        cf_padded_tokens = np.full((n, _k+1, num_classes, _num_sets, num_cf, max_len), pad_token_id)
+        cf_padded_attention_mask = np.full((n, _k+1, num_classes, _num_sets, num_cf, max_len), 0)
+        cf_padded_label_mask = np.full((n, _k+1, num_classes, _num_sets, num_cf, max_len), 0)
+
+                
+        for i in range(n):
+            for num_examples in range(_k+1):
+                for j in range(num_classes):
+                    for k in range(_num_sets):
+                        padded_tokens[i, num_examples, j, k, :len(tokens[i, num_examples, j, k])] = tokens[i, num_examples, j, k]
+                        padded_attention_mask[i, num_examples, j, k, :len(attention_masks[i, num_examples, j, k])] = attention_masks[i, num_examples, j, k]
+                        padded_label_mask[i, num_examples, j, k, :len(label_masks[i, num_examples, j, k])] = label_masks[i, num_examples, j, k]
+
+                        # test
+                        test_prd = padded_label_mask[i, num_examples, j, k, :] * padded_tokens[i, num_examples, j, k, :]
+
+                        assert (test_prd[test_prd != 0] == tok_labels[j]).all()
+                        # print(tokenizer.decode(test_prd[test_prd != 0]))
+                        
+
+                        for c in range(num_cf):
+                            cf_padded_tokens[i, num_examples, j, k, c, :len(cf_tokens[i, num_examples, j, k, c])] = cf_tokens[i, num_examples, j, k, c]
+                            cf_padded_attention_mask[i, num_examples, j, k, c, :len(cf_attention_masks[i, num_examples, j, k, c])] = cf_attention_masks[i, num_examples, j, k, c]
+                            cf_padded_label_mask[i, num_examples, j, k, c, :len(cf_label_masks[i, num_examples, j, k, c])] = cf_label_masks[i, num_examples, j, k, c]
+                            
+                            test_prd_cf = cf_padded_label_mask[i, num_examples, j, k, c, :] * cf_padded_tokens[i, num_examples, j, k, c, :]
+
+                            assert (test_prd_cf[test_prd_cf != 0] == tok_labels[j]).all()
+        print("passed assertions")
+        # print("%%%%%%%")
+        # print(labels[:10])
+        # print(padded_tokens[:10, 0, 0, :])
+        tokenized_dataset = {
+            'input_ids': torch.from_numpy(padded_tokens),
+            'attention_mask': torch.from_numpy(padded_attention_mask),
+            'label_mask': torch.from_numpy(padded_label_mask),
+            'labels': torch.from_numpy(labels), # (n)
+            'cf_input_ids': torch.from_numpy(cf_padded_tokens),
+            'cf_attention_mask': torch.from_numpy(cf_padded_attention_mask),
+            'cf_label_mask': torch.from_numpy(cf_padded_label_mask),
+        }
+        print("***")
+        for key, val in tokenized_dataset.items():
+            print(key, ": ", val.shape)
+        # print("***************")
+        # for key, val in tokenized_dataset.items():
+        #     print(key, ":", val.shape)
+        # input()
+        # print(tokenized_dataset['input_ids'].shape, tokenized_dataset['labels'].shape)
+        # test_i = 2
+        # test_j = 0
+        # test_examples = 3
+        # test_k = 2
+        # quoted_sentence = "\"" + sentences[test_i] + "\""
+        # print(tokenizer(s_tmp))
+        # print(len(np.where(padded_tokens[test_i, test_j, test_k, :] != pad_token_id)[0]))
+        # print("^^^^^^^")
+        # print(np.where(padded_tokens[test_i, test_j, test_k, :]==tokenizer(label_names[test_j])))
+        # print(padded_tokens[test_i, test_examples, test_j, test_k, :])
+        # print(tokenizer('True', add_special_tokens=False))
+        # print(tokenizer('False', add_special_tokens=False))
+        # print(padded_label_mask[test_i, test_examples, test_j, test_k, :])
+        # print(np.where(padded_label_mask[test_i, test_j, test_k, :] == 1))
+        # print(padded_attention_mask[test_i, test_examples, test_j, test_k, :])
+        # val = np.dot(padded_tokens[test_i, test_examples, test_j, test_k, :], padded_label_mask[test_i, test_examples, test_j, test_k, :])
+        # print("****", val)
+        # print("\"" + str(tokenizer.decode(val)) + "\"")
+        # print(tokenizer.decode([25]))
+        # print(s_tmp.format(text1=quoted_masked, text2=quoted_target))
+        # # print(splitted[0][3])
+        # print(quoted_target)
+        # print(tokenizer(quoted_target)["input_ids"])
+        # print(padded_tokenized_targets[test_i, test_j, test_k])
+        # print(quoted_masked)
+        # print(tokenizer(quoted_masked, add_special_tokens=False)["input_ids"])
+
+        return tokenized_dataset
+
+    
+    tokenized_dataset = raw_dataset.map(preprocess_function, batched=True)
+    
+    columns_to_remove = raw_dataset.column_names
+    if label2id is None:
+        columns_to_remove.remove(labelfield)
+    tokenized_dataset = tokenized_dataset.remove_columns(columns_to_remove)
+    logging.info(tokenized_dataset)
+    tokenized_dataset.set_format("torch")
+
+    return tokenized_dataset

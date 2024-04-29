@@ -15,7 +15,12 @@ else:
     title=""
 colors = ["red", "blue", "green", "black"]
 i = 0
-for setting in ["", "cc_"]:
+settings = [""]
+if not ("hGivenP" in title or "pGivenH" in title):
+    settings.append("cc_")
+
+
+for setting in settings:
     for m in ['accuracy', 'f1']:
         with open(sys.argv[1]) as f:
             # y_arithmetic = {}
@@ -47,7 +52,7 @@ for setting in ["", "cc_"]:
             # print(y)
             # print(y_geometric)
             # print(x)
-            plt.errorbar(x, y_mean, y_std, color=colors[i], label=setting+m)
+            plt.errorbar([1*i for i in x], y_mean, y_std, color=colors[i], label=setting+m)
             i += 1
             # print("1")
             # plt.errorbar(x, y_geometricmean, y_geometricstd, color="blue", label=m+" geometric")
